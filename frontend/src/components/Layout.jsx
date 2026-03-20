@@ -19,6 +19,9 @@ export default function Layout({ children }) {
           <NavLink to="/dashboard">
             <span>📊</span> Dashboard
           </NavLink>
+          <NavLink to="/projects">
+            <span>🗂️</span> Projects
+          </NavLink>
           <NavLink to="/requirements">
             <span>📄</span> Requirements
           </NavLink>

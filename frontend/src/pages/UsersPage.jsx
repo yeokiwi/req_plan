@@ -3,14 +3,35 @@ import Layout from '../components/Layout';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
+const EMPTY_FORM = { username: '', email: '', password: '', role: 'viewer' };
+
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [creating, setCreating] = useState(false);
   const { user: me } = useAuth();
 
   useEffect(() => {
     api.users.list().then(setUsers).catch(err => setError(err.message));
   }, []);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    setError('');
+    setCreating(true);
+    try {
+      const newUser = await api.users.create(form);
+      setUsers(prev => [...prev, newUser]);
+      setForm(EMPTY_FORM);
+      setShowModal(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function handleRoleChange(id, role) {
     try {
@@ -36,6 +57,7 @@ export default function UsersPage() {
       <div className="page">
         <div className="page-header">
           <h1 className="page-title">Users</h1>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New User</button>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -89,6 +111,57 @@ export default function UsersPage() {
           </div>
         </div>
       </div>
+
+      {showModal && (
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Create User Account</h2>
+            {error && <div className="alert alert-error">{error}</div>}
+            <form onSubmit={handleCreate}>
+              <div className="form-group">
+                <label>Username *</label>
+                <input
+                  value={form.username}
+                  onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Email *</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Password *</label>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Role</label>
+                <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                  <option value="viewer">viewer</option>
+                  <option value="manager">manager</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setError(''); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  {creating ? 'Creating…' : 'Create User'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

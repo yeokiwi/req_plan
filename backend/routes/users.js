@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
 
@@ -9,6 +10,30 @@ router.use(authenticate);
 router.get('/', requireRole('admin', 'manager'), (req, res) => {
   const users = db.prepare('SELECT id, username, email, role, created_at FROM users').all();
   res.json(users);
+});
+
+// Admin creates a new user account
+router.post('/', requireRole('admin'), (req, res) => {
+  const { username, email, password, role } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: 'username, email and password are required' });
+  }
+  if (role && !['admin', 'manager', 'viewer'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  try {
+    const result = db.prepare(`
+      INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)
+    `).run(username, email, hash, role || 'viewer');
+    const user = db.prepare('SELECT id, username, email, role, created_at FROM users WHERE id = ?').get(Number(result.lastInsertRowid));
+    res.status(201).json(user);
+  } catch (err) {
+    if (err.message.includes('UNIQUE')) {
+      return res.status(409).json({ error: 'Username or email already exists' });
+    }
+    throw err;
+  }
 });
 
 router.put('/:id/role', requireRole('admin'), (req, res) => {

@@ -10,6 +10,8 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/requirements', require('./routes/requirements'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/projects', require('./routes/projects'));
+app.use('/api/modules', require('./routes/modules'));
 
 app.use((err, req, res, next) => {
   console.error(err);

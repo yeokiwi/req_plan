@@ -41,7 +41,22 @@ export const api = {
   },
   users: {
     list: () => request('/users'),
+    create: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
     setRole: (id, role) => request(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
     delete: (id) => request(`/users/${id}`, { method: 'DELETE' }),
+  },
+  projects: {
+    list: () => request('/projects'),
+    get: (id) => request(`/projects/${id}`),
+    create: (body) => request('/projects', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id, body) => request(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    delete: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
+    createModule: (id, body) => request(`/projects/${id}/modules`, { method: 'POST', body: JSON.stringify(body) }),
+  },
+  modules: {
+    list: () => request('/modules'),
+    get: (id) => request(`/modules/${id}`),
+    update: (id, body) => request(`/modules/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    delete: (id) => request(`/modules/${id}`, { method: 'DELETE' }),
   },
 };

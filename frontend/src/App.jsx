@@ -8,6 +8,9 @@ import RequirementsPage from './pages/RequirementsPage';
 import RequirementDetailPage from './pages/RequirementDetailPage';
 import TagsPage from './pages/TagsPage';
 import UsersPage from './pages/UsersPage';
+import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import ModuleDetailPage from './pages/ModuleDetailPage';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -32,6 +35,9 @@ function AppRoutes() {
       <Route path="/requirements/:id" element={<RequireAuth><RequirementDetailPage /></RequireAuth>} />
       <Route path="/tags" element={<RequireAuth><TagsPage /></RequireAuth>} />
       <Route path="/users" element={<RequireAuth><RequireAdmin><UsersPage /></RequireAdmin></RequireAuth>} />
+      <Route path="/projects" element={<RequireAuth><ProjectsPage /></RequireAuth>} />
+      <Route path="/projects/:id" element={<RequireAuth><ProjectDetailPage /></RequireAuth>} />
+      <Route path="/modules/:id" element={<RequireAuth><ModuleDetailPage /></RequireAuth>} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

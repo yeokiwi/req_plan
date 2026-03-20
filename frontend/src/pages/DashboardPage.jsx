@@ -25,6 +25,14 @@ export default function DashboardPage() {
 
         <div className="stat-grid">
           <div className="stat-card">
+            <div className="stat-label">Projects</div>
+            <div className="stat-value">{stats?.projectCount ?? '—'}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Modules</div>
+            <div className="stat-value">{stats?.moduleCount ?? '—'}</div>
+          </div>
+          <div className="stat-card">
             <div className="stat-label">Total Requirements</div>
             <div className="stat-value">{stats?.total ?? '—'}</div>
           </div>

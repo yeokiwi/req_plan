@@ -7,6 +7,27 @@ db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS modules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -49,6 +70,12 @@ db.exec(`
     UNIQUE(source_id, target_id, link_type)
   );
 `);
+
+// Migration: add module_id to requirements if not present
+const reqCols = db.prepare('PRAGMA table_info(requirements)').all();
+if (!reqCols.find(c => c.name === 'module_id')) {
+  db.exec('ALTER TABLE requirements ADD COLUMN module_id INTEGER REFERENCES modules(id) ON DELETE SET NULL');
+}
 
 // Seed an initial admin user if none exists
 const adminExists = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,43 +10,73 @@ const LINK_TYPES = ['related', 'depends_on', 'parent', 'child'];
 
 export default function RequirementDetailPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = user?.role === 'admin' || user?.role === 'manager';
   const isNew = id === 'new';
 
-  const [form, setForm] = useState({ title: '', description: '', status: 'draft', priority: 'medium' });
+  const [form, setForm] = useState({
+    title: '', description: '', status: 'draft', priority: 'medium',
+    module_id: searchParams.get('module_id') || '',
+  });
   const [req, setReq] = useState(null);
   const [allTags, setAllTags] = useState([]);
   const [allReqs, setAllReqs] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [modules, setModules] = useState([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Link modal state
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkForm, setLinkForm] = useState({ target_id: '', link_type: 'related' });
 
   useEffect(() => {
     api.tags.list().then(setAllTags).catch(console.error);
     api.requirements.list().then(setAllReqs).catch(console.error);
+    api.projects.list().then(setProjects).catch(console.error);
+    api.modules.list().then(setModules).catch(console.error);
     if (!isNew) {
       api.requirements.get(id).then(data => {
         setReq(data);
-        setForm({ title: data.title, description: data.description || '', status: data.status, priority: data.priority });
+        setForm({
+          title: data.title,
+          description: data.description || '',
+          status: data.status,
+          priority: data.priority,
+          module_id: data.module_id || '',
+        });
       }).catch(() => navigate('/requirements'));
     }
   }, [id]);
+
+  // Derive selected project from chosen module
+  const selectedModule = modules.find(m => String(m.id) === String(form.module_id));
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  useEffect(() => {
+    if (selectedModule) setSelectedProjectId(String(selectedModule.project_id));
+  }, [selectedModule?.project_id]);
+
+  const visibleModules = selectedProjectId
+    ? modules.filter(m => String(m.project_id) === selectedProjectId)
+    : modules;
+
+  function handleProjectChange(pid) {
+    setSelectedProjectId(pid);
+    setForm(f => ({ ...f, module_id: '' }));
+  }
 
   async function handleSave(e) {
     e.preventDefault();
     setError('');
     setSaving(true);
     try {
+      const body = { ...form, module_id: form.module_id ? parseInt(form.module_id) : null };
       if (isNew) {
-        const created = await api.requirements.create(form);
+        const created = await api.requirements.create(body);
         navigate(`/requirements/${created.id}`);
       } else {
-        const updated = await api.requirements.update(id, form);
+        const updated = await api.requirements.update(id, body);
         setReq(updated);
       }
     } catch (err) {
@@ -88,15 +118,25 @@ export default function RequirementDetailPage() {
   const linkedTargetIds = new Set(req?.links?.map(l => l.target_id) || []);
   const availableReqs = allReqs.filter(r => r.id !== parseInt(id) && !linkedTargetIds.has(r.id));
 
+  const backTarget = req?.module_id
+    ? `/modules/${req.module_id}`
+    : '/requirements';
+
   return (
     <Layout>
       <div className="page">
         <div className="page-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/requirements')}>← Back</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate(backTarget)}>← Back</button>
             <h1 className="page-title">
               {isNew ? 'New Requirement' : (req?.req_id || '…')}
             </h1>
+            {!isNew && req?.project_name && (
+              <span className="text-muted text-sm">
+                <Link to={`/projects/${req.project_id}`}>{req.project_name}</Link>
+                {req.module_name && <> / <Link to={`/modules/${req.module_id}`}>{req.module_name}</Link></>}
+              </span>
+            )}
           </div>
         </div>
 
@@ -138,6 +178,30 @@ export default function RequirementDetailPage() {
                     </select>
                   </div>
                 </div>
+
+                {canEdit && projects.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="form-group">
+                      <label>Project</label>
+                      <select value={selectedProjectId} onChange={e => handleProjectChange(e.target.value)} disabled={!canEdit}>
+                        <option value="">— None —</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Module</label>
+                      <select
+                        value={form.module_id}
+                        onChange={e => setForm(f => ({ ...f, module_id: e.target.value }))}
+                        disabled={!canEdit || !selectedProjectId}
+                      >
+                        <option value="">— None —</option>
+                        {visibleModules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 {canEdit && (
                   <button className="btn btn-primary" type="submit" disabled={saving}>
                     {saving ? 'Saving…' : (isNew ? 'Create Requirement' : 'Save Changes')}
@@ -160,6 +224,11 @@ export default function RequirementDetailPage() {
                         {link.target_req_id}
                       </Link>
                       <span style={{ marginLeft: 6, color: 'var(--text-muted)' }}>{link.target_title}</span>
+                      {link.target_module_name && (
+                        <span className="text-muted text-sm" style={{ marginLeft: 6 }}>
+                          ({link.target_project_name} / {link.target_module_name})
+                        </span>
+                      )}
                     </div>
                     {canEdit && (
                       <button className="btn btn-secondary btn-sm" onClick={() => handleRemoveLink(link.id)}>Remove</button>
@@ -187,6 +256,22 @@ export default function RequirementDetailPage() {
                   <div className="meta-item">
                     <label>Priority</label>
                     <div className="meta-value"><span className={`badge badge-${req?.priority}`}>{req?.priority}</span></div>
+                  </div>
+                  <div className="meta-item">
+                    <label>Project</label>
+                    <div className="meta-value text-sm">
+                      {req?.project_name
+                        ? <Link to={`/projects/${req.project_id}`}>{req.project_name}</Link>
+                        : '—'}
+                    </div>
+                  </div>
+                  <div className="meta-item">
+                    <label>Module</label>
+                    <div className="meta-value text-sm">
+                      {req?.module_name
+                        ? <Link to={`/modules/${req.module_id}`}>{req.module_name}</Link>
+                        : '—'}
+                    </div>
                   </div>
                   <div className="meta-item">
                     <label>Created by</label>
@@ -246,7 +331,10 @@ export default function RequirementDetailPage() {
                 <select value={linkForm.target_id} onChange={e => setLinkForm(f => ({ ...f, target_id: e.target.value }))} required>
                   <option value="">Select requirement…</option>
                   {availableReqs.map(r => (
-                    <option key={r.id} value={r.id}>{r.req_id} — {r.title}</option>
+                    <option key={r.id} value={r.id}>
+                      {r.req_id} — {r.title}
+                      {r.module_name ? ` (${r.project_name} / ${r.module_name})` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
