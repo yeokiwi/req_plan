@@ -193,9 +193,9 @@ router.delete('/meta/tags/:id', requireRole('admin'), (req, res) => {
   res.status(204).end();
 });
 
-// All traceability links, scoped by project or module
+// All traceability links, scoped by project or module (bidirectional)
 router.get('/meta/links', (req, res) => {
-  const { project_id, module_id } = req.query;
+  const { project_id, module_id, source_module_id, target_module_id } = req.query;
   let query = `
     SELECT rl.id, rl.source_id, rl.target_id, rl.link_type,
            r1.req_id AS source_req_id, r1.title AS source_title,
@@ -206,12 +206,15 @@ router.get('/meta/links', (req, res) => {
     WHERE 1=1
   `;
   const params = [];
-  if (module_id) {
-    query += ' AND r1.module_id = ?';
-    params.push(module_id);
+  if (source_module_id && target_module_id) {
+    query += ' AND ((r1.module_id = ? AND r2.module_id = ?) OR (r1.module_id = ? AND r2.module_id = ?))';
+    params.push(source_module_id, target_module_id, target_module_id, source_module_id);
+  } else if (module_id) {
+    query += ' AND (r1.module_id = ? OR r2.module_id = ?)';
+    params.push(module_id, module_id);
   } else if (project_id) {
-    query += ' AND r1.module_id IN (SELECT id FROM modules WHERE project_id = ?)';
-    params.push(project_id);
+    query += ' AND (r1.module_id IN (SELECT id FROM modules WHERE project_id = ?) OR r2.module_id IN (SELECT id FROM modules WHERE project_id = ?))';
+    params.push(project_id, project_id);
   }
   res.json(db.prepare(query).all(...params));
 });
