@@ -43,6 +43,8 @@ export const api = {
     list: () => request('/users'),
     create: (body) => request('/users', { method: 'POST', body: JSON.stringify(body) }),
     setRole: (id, role) => request(`/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+    resetPassword: (id, new_password) => request(`/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ new_password }) }),
+    changePassword: (current_password, new_password) => request('/users/me/password', { method: 'PUT', body: JSON.stringify({ current_password, new_password }) }),
     delete: (id) => request(`/users/${id}`, { method: 'DELETE' }),
   },
   projects: {

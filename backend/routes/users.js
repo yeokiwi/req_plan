@@ -36,6 +36,40 @@ router.post('/', requireRole('admin'), (req, res) => {
   }
 });
 
+// Any authenticated user can change their own password
+router.put('/me/password', (req, res) => {
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'current_password and new_password are required' });
+  }
+  if (new_password.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!bcrypt.compareSync(current_password, user.password_hash)) {
+    return res.status(400).json({ error: 'Current password is incorrect' });
+  }
+  const hash = bcrypt.hashSync(new_password, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.id);
+  res.json({ message: 'Password updated successfully' });
+});
+
+// Admin resets any user's password (no current password required)
+router.put('/:id/password', requireRole('admin'), (req, res) => {
+  const { new_password } = req.body;
+  if (!new_password) {
+    return res.status(400).json({ error: 'new_password is required' });
+  }
+  if (new_password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const hash = bcrypt.hashSync(new_password, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.params.id);
+  res.json({ message: 'Password reset successfully' });
+});
+
 router.put('/:id/role', requireRole('admin'), (req, res) => {
   const { role } = req.body;
   if (!['admin', 'manager', 'viewer'].includes(role)) {

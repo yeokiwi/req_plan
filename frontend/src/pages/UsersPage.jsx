@@ -13,6 +13,13 @@ export default function UsersPage() {
   const [creating, setCreating] = useState(false);
   const { user: me } = useAuth();
 
+  // Reset password state
+  const [resetTarget, setResetTarget] = useState(null); // { id, username }
+  const [resetPwd, setResetPwd] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetting, setResetting] = useState(false);
+
   useEffect(() => {
     api.users.list().then(setUsers).catch(err => setError(err.message));
   }, []);
@@ -39,6 +46,23 @@ export default function UsersPage() {
       setUsers(prev => prev.map(u => u.id === id ? updated : u));
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function handleResetPassword(e) {
+    e.preventDefault();
+    setResetError('');
+    if (resetPwd !== resetConfirm) { setResetError('Passwords do not match.'); return; }
+    setResetting(true);
+    try {
+      await api.users.resetPassword(resetTarget.id, resetPwd);
+      setResetTarget(null);
+      setResetPwd('');
+      setResetConfirm('');
+    } catch (err) {
+      setResetError(err.message);
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -95,7 +119,13 @@ export default function UsersPage() {
                       </select>
                     </td>
                     <td className="text-muted text-sm">{u.created_at?.slice(0, 10)}</td>
-                    <td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => { setResetTarget(u); setResetPwd(''); setResetConfirm(''); setResetError(''); }}
+                      >
+                        Reset Password
+                      </button>
                       <button
                         className="btn btn-danger btn-sm"
                         onClick={() => handleDelete(u.id)}
@@ -111,6 +141,42 @@ export default function UsersPage() {
           </div>
         </div>
       </div>
+
+      {resetTarget && (
+        <div className="modal-backdrop" onClick={() => setResetTarget(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Reset Password — {resetTarget.username}</h2>
+            {resetError && <div className="alert alert-error">{resetError}</div>}
+            <form onSubmit={handleResetPassword}>
+              <div className="form-group">
+                <label>New Password *</label>
+                <input
+                  type="password"
+                  value={resetPwd}
+                  onChange={e => setResetPwd(e.target.value)}
+                  minLength={6}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Confirm New Password *</label>
+                <input
+                  type="password"
+                  value={resetConfirm}
+                  onChange={e => setResetConfirm(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setResetTarget(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={resetting}>
+                  {resetting ? 'Saving…' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
