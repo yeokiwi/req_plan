@@ -59,4 +59,16 @@ export const api = {
     update: (id, body) => request(`/modules/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     delete: (id) => request(`/modules/${id}`, { method: 'DELETE' }),
   },
+  links: {
+    list: (params = {}) => request('/requirements/meta/links?' + new URLSearchParams(params)),
+  },
+  export: {
+    project: async (id) => {
+      const res = await fetch(`${BASE}/projects/${id}/export`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    },
+  },
 };

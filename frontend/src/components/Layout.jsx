@@ -25,6 +25,9 @@ export default function Layout({ children }) {
           <NavLink to="/requirements">
             <span>📄</span> Requirements
           </NavLink>
+          <NavLink to="/traceability">
+            <span>🔗</span> Traceability
+          </NavLink>
           {(user?.role === 'admin' || user?.role === 'manager') && (
             <NavLink to="/tags">
               <span>🏷️</span> Tags

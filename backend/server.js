@@ -12,6 +12,7 @@ app.use('/api/requirements', require('./routes/requirements'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/modules', require('./routes/modules'));
+app.use('/api/projects', require('./routes/export'));
 
 app.use((err, req, res, next) => {
   console.error(err);

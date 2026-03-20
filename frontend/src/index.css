@@ -130,3 +130,34 @@ tr:hover td { background: #f8fafc; }
 .text-muted { color: var(--text-muted); }
 .text-sm { font-size: 12px; }
 .font-mono { font-family: monospace; }
+
+/* Traceability Matrix */
+.matrix-wrap { overflow: auto; max-height: 65vh; border-radius: var(--radius); }
+.matrix-table { border-collapse: collapse; font-size: 12px; }
+.matrix-table th, .matrix-table td { border: 1px solid var(--border); padding: 0; }
+.matrix-corner {
+  position: sticky; top: 0; left: 0; z-index: 4;
+  background: var(--primary); color: #fff; font-weight: 700;
+  padding: 10px 14px; white-space: nowrap; font-size: 12px; min-width: 220px;
+}
+.matrix-col-header {
+  position: sticky; top: 0; z-index: 3;
+  background: var(--primary); min-width: 44px; text-align: center; vertical-align: bottom;
+}
+.matrix-col-label {
+  display: block; writing-mode: vertical-lr; transform: rotate(180deg);
+  padding: 10px 6px; font-size: 11px; font-weight: 600; color: #fff;
+  cursor: pointer; font-family: monospace; white-space: nowrap;
+}
+.matrix-col-label:hover { color: #c7d2fe; }
+.matrix-row-label {
+  position: sticky; left: 0; z-index: 2;
+  background: #f8fafc; border-right: 2px solid var(--border) !important;
+  padding: 7px 10px; cursor: pointer; white-space: nowrap;
+  display: flex; align-items: center; gap: 8px;
+  min-width: 220px; max-width: 320px;
+}
+.matrix-row-label:hover { background: #eef2ff; }
+.matrix-cell-self { background: #f1f5f9; color: #94a3b8; text-align: center; font-size: 14px; padding: 6px; }
+.matrix-cell-empty { background: #fff; min-width: 44px; height: 36px; }
+.matrix-cell-link { text-align: center; font-weight: 700; font-size: 13px; padding: 6px 4px; }

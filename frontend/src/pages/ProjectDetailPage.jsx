@@ -16,6 +16,7 @@ export default function ProjectDetailPage() {
   const [showModuleModal, setShowModuleModal] = useState(false);
   const [moduleForm, setModuleForm] = useState({ name: '', description: '' });
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     api.projects.get(id).then(p => {
@@ -58,6 +59,26 @@ export default function ProjectDetailPage() {
     setProject(prev => ({ ...prev, modules: prev.modules.filter(m => m.id !== moduleId) }));
   }
 
+  async function handleExport() {
+    setExporting(true);
+    setError('');
+    try {
+      const blob = await api.export.project(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(project.name).replace(/[^a-z0-9 \-_]/gi, '').trim()}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (!project) return <Layout><div className="page empty">Loading…</div></Layout>;
 
   return (
@@ -69,6 +90,9 @@ export default function ProjectDetailPage() {
             <h1 className="page-title">{project.name}</h1>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={handleExport} disabled={exporting}>
+              {exporting ? 'Exporting…' : '⬇ Export to Word'}
+            </button>
             {canEdit && !editing && (
               <button className="btn btn-secondary" onClick={() => setEditing(true)}>Edit Project</button>
             )}
