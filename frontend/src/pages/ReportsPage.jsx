@@ -416,6 +416,41 @@ function CoverageReport({ requirements, coveredReqs, uncoveredReqs, coveragePct,
   );
 }
 
+// ── Diff computation (pure function, no React) ─────────────────────────────────
+function computeDiff(bA, bB) {
+  const mapA = {};
+  bA.requirements.forEach(r => { mapA[r.requirement_id] = r; });
+  const mapB = {};
+  bB.requirements.forEach(r => { mapB[r.requirement_id] = r; });
+
+  const allIds = new Set([...Object.keys(mapA), ...Object.keys(mapB)].map(Number));
+  const added = [], removed = [], changed = [];
+
+  allIds.forEach(id => {
+    const a = mapA[id], b = mapB[id];
+    if (!a && b)  { added.push(b); return; }
+    if (a && !b)  { removed.push(a); return; }
+    const diffs = [];
+    for (const f of ['title', 'description', 'status', 'priority', 'module_name']) {
+      const va = (a[f] || '').toString(), vb = (b[f] || '').toString();
+      if (va !== vb) diffs.push({ field: f, from: va || '—', to: vb || '—' });
+    }
+    if (diffs.length > 0) changed.push({ req: b, diffs });
+  });
+
+  // Build req_id lookup from both baselines
+  const idToReqId = {};
+  [...bA.requirements, ...bB.requirements].forEach(r => { idToReqId[r.requirement_id] = r.req_id; });
+
+  const linkKey = l => `${l.source_requirement_id}|${l.target_requirement_id}|${l.link_type}`;
+  const setA = new Set(bA.links.map(linkKey));
+  const setB = new Set(bB.links.map(linkKey));
+  const linksAdded   = bB.links.filter(l => !setA.has(linkKey(l)));
+  const linksRemoved = bA.links.filter(l => !setB.has(linkKey(l)));
+
+  return { added, removed, changed, linksAdded, linksRemoved, idToReqId };
+}
+
 // ── Baselines Tab ──────────────────────────────────────────────────────────────
 function BaselinesTab({ projects }) {
   const { user } = useAuth();
@@ -430,13 +465,24 @@ function BaselinesTab({ projects }) {
   const [saving, setSaving]         = useState(false);
   const [formError, setFormError]   = useState('');
   const [expandedId, setExpandedId] = useState(null);
-  const [expanded, setExpanded]     = useState(null); // full baseline data
-  const [restoreMsg, setRestoreMsg] = useState({});   // id -> message
+  const [expanded, setExpanded]     = useState(null);
+  const [restoreMsg, setRestoreMsg] = useState({});
   const [restoring, setRestoring]   = useState(null);
 
+  // Compare state
+  const [baselineAId, setBaselineAId] = useState('');
+  const [baselineBId, setBaselineBId] = useState('');
+  const [diff, setDiff]               = useState(null);
+  const [comparing, setComparing]     = useState(false);
+
   useEffect(() => {
-    if (!projectId) { setBaselines([]); return; }
+    if (!projectId) { setBaselines([]); setDiff(null); return; }
     loadBaselines();
+  }, [projectId]);
+
+  // Reset compare when project changes
+  useEffect(() => {
+    setBaselineAId(''); setBaselineBId(''); setDiff(null);
   }, [projectId]);
 
   async function loadBaselines() {
@@ -482,9 +528,24 @@ function BaselinesTab({ projects }) {
     try {
       await api.baselines.delete(id);
       if (expandedId === id) { setExpandedId(null); setExpanded(null); }
+      if (String(baselineAId) === String(id)) { setBaselineAId(''); setDiff(null); }
+      if (String(baselineBId) === String(id)) { setBaselineBId(''); setDiff(null); }
       setRestoreMsg(prev => { const n = { ...prev }; delete n[id]; return n; });
       await loadBaselines();
     } catch (err) { console.error(err); }
+  }
+
+  async function handleCompare() {
+    if (!baselineAId || !baselineBId || baselineAId === baselineBId) return;
+    setComparing(true); setDiff(null);
+    try {
+      const [bA, bB] = await Promise.all([
+        api.baselines.get(baselineAId),
+        api.baselines.get(baselineBId),
+      ]);
+      setDiff({ result: computeDiff(bA, bB), nameA: bA.name, nameB: bB.name });
+    } catch (err) { console.error(err); }
+    finally { setComparing(false); }
   }
 
   const TH_STYLE = {
@@ -493,9 +554,11 @@ function BaselinesTab({ projects }) {
     textTransform: 'uppercase', letterSpacing: '.04em', background: '#f8fafc',
   };
 
+  const canCompare = baselineAId && baselineBId && baselineAId !== baselineBId;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Project selector */}
+      {/* Project selector + Create button */}
       <div className="card" style={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div style={{ flex: 1, minWidth: 220 }}>
@@ -545,6 +608,43 @@ function BaselinesTab({ projects }) {
         )}
       </div>
 
+      {/* Compare panel — shown when ≥ 2 baselines exist */}
+      {projectId && baselines.length >= 2 && (
+        <div className="card" style={{ padding: '16px 20px' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Compare Baselines</div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>Baseline A (before)</label>
+              <select value={baselineAId} onChange={e => { setBaselineAId(e.target.value); setDiff(null); }}>
+                <option value="">— Select —</option>
+                {baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div style={{ paddingBottom: 2, color: 'var(--text-muted)', fontWeight: 700 }}>vs</div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>Baseline B (after)</label>
+              <select value={baselineBId} onChange={e => { setBaselineBId(e.target.value); setDiff(null); }}>
+                <option value="">— Select —</option>
+                {baselines.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={handleCompare}
+              disabled={!canCompare || comparing}
+            >
+              {comparing ? 'Comparing…' : '⇄ Compare'}
+            </button>
+          </div>
+          {baselineAId && baselineBId && baselineAId === baselineBId && (
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--warning)' }}>Select two different baselines.</div>
+          )}
+        </div>
+      )}
+
+      {/* Diff result */}
+      {diff && <BaselineDiff diff={diff} />}
+
       {/* Baselines list */}
       {!projectId ? null : loading ? (
         <div className="card empty">Loading…</div>
@@ -556,11 +656,7 @@ function BaselinesTab({ projects }) {
           const msg = restoreMsg[b.id];
           return (
             <div key={b.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              {/* Header row */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 16px', flexWrap: 'wrap',
-              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{b.name}</div>
                   {b.description && (
@@ -585,10 +681,7 @@ function BaselinesTab({ projects }) {
                       >
                         {restoring === b.id ? 'Restoring…' : '↩ Restore'}
                       </button>
-                      <button
-                        className="btn btn-danger" style={{ fontSize: 12 }}
-                        onClick={() => handleDelete(b.id)}
-                      >
+                      <button className="btn btn-danger" style={{ fontSize: 12 }} onClick={() => handleDelete(b.id)}>
                         Delete
                       </button>
                     </>
@@ -596,19 +689,17 @@ function BaselinesTab({ projects }) {
                 </div>
               </div>
 
-              {/* Restore result message */}
               {msg && (
                 <div style={{
-                  margin: '0 16px 12px', padding: '8px 12px', borderRadius: 6,
+                  margin: '0 16px 12px', padding: '8px 12px', borderRadius: 6, fontSize: 13,
                   background: msg.startsWith('Error') ? '#fef2f2' : '#f0fdf4',
                   color: msg.startsWith('Error') ? '#dc2626' : '#16a34a',
-                  fontSize: 13, border: `1px solid ${msg.startsWith('Error') ? '#fecaca' : '#bbf7d0'}`,
+                  border: `1px solid ${msg.startsWith('Error') ? '#fecaca' : '#bbf7d0'}`,
                 }}>
                   {msg}
                 </div>
               )}
 
-              {/* Expanded details */}
               {isExpanded && (
                 <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }}>
                   {!expanded || expanded.id !== b.id ? (
@@ -650,6 +741,163 @@ function BaselinesTab({ projects }) {
             </div>
           );
         })
+      )}
+    </div>
+  );
+}
+
+// ── Baseline Diff Renderer ─────────────────────────────────────────────────────
+function BaselineDiff({ diff }) {
+  const { result, nameA, nameB } = diff;
+  const { added, removed, changed, linksAdded, linksRemoved, idToReqId } = result;
+
+  const totalChanges = added.length + removed.length + changed.length + linksAdded.length + linksRemoved.length;
+
+  const SECTION = ({ color, bg, border, title, count, children }) => (
+    <div className="card" style={{ padding: 0, overflow: 'hidden', border: `1px solid ${border}` }}>
+      <div style={{ padding: '10px 16px', background: bg, borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color }}>{title}</span>
+        <span style={{ ...BADGE, background: color + '22', color, fontSize: 11 }}>{count}</span>
+      </div>
+      <div style={{ padding: '12px 16px' }}>{children}</div>
+    </div>
+  );
+
+  const TH = { padding: '6px 12px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid var(--border)', background: '#f8fafc' };
+  const TD = { padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: 12 };
+
+  function ReqRow({ r }) {
+    return (
+      <tr>
+        <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{r.req_id}</td>
+        <td style={{ ...TD, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</td>
+        <td style={{ ...TD, color: 'var(--text-muted)' }}>{r.module_name || '—'}</td>
+        <td style={TD}>
+          <span style={{ ...BADGE, background: (STATUS_COLOR[r.status] || '#94a3b8') + '22', color: STATUS_COLOR[r.status] || '#94a3b8' }}>{r.status}</span>
+        </td>
+        <td style={TD}>
+          <span style={{ ...BADGE, background: (PRIORITY_COLOR[r.priority] || '#94a3b8') + '22', color: PRIORITY_COLOR[r.priority] || '#94a3b8' }}>{r.priority}</span>
+        </td>
+      </tr>
+    );
+  }
+
+  function ReqTable({ rows }) {
+    return (
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead><tr>{['ID', 'Title', 'Module', 'Status', 'Priority'].map(h => <th key={h} style={TH}>{h}</th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => <ReqRow key={i} r={r} />)}</tbody>
+      </table>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header */}
+      <div className="card" style={{ padding: '14px 20px' }}>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
+          Comparison: <span style={{ color: 'var(--primary)' }}>{nameA}</span>
+          <span style={{ margin: '0 8px', color: 'var(--text-muted)', fontWeight: 400 }}>→</span>
+          <span style={{ color: 'var(--primary)' }}>{nameB}</span>
+        </div>
+        {totalChanges === 0 ? (
+          <div style={{ color: '#16a34a', fontWeight: 600, fontSize: 13 }}>No differences — the two baselines are identical.</div>
+        ) : (
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Added', count: added.length, color: '#16a34a' },
+              { label: 'Removed', count: removed.length, color: '#dc2626' },
+              { label: 'Changed', count: changed.length, color: '#d97706' },
+              { label: 'Links +', count: linksAdded.length, color: '#2563eb' },
+              { label: 'Links −', count: linksRemoved.length, color: '#7c3aed' },
+            ].map(s => (
+              <div key={s.label} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.count}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Added requirements */}
+      {added.length > 0 && (
+        <SECTION title="Added Requirements" count={added.length} color="#16a34a" bg="#f0fdf4" border="#bbf7d0">
+          <ReqTable rows={added} />
+        </SECTION>
+      )}
+
+      {/* Removed requirements */}
+      {removed.length > 0 && (
+        <SECTION title="Removed Requirements" count={removed.length} color="#dc2626" bg="#fef2f2" border="#fecaca">
+          <ReqTable rows={removed} />
+        </SECTION>
+      )}
+
+      {/* Changed requirements */}
+      {changed.length > 0 && (
+        <SECTION title="Changed Requirements" count={changed.length} color="#d97706" bg="#fffbeb" border="#fde68a">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>{['ID', 'Field', `${nameA} (before)`, `${nameB} (after)`].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {changed.map(({ req, diffs }, i) =>
+                diffs.map((d, j) => (
+                  <tr key={`${i}-${j}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                    {j === 0 && (
+                      <td rowSpan={diffs.length} style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, verticalAlign: 'top', borderRight: '1px solid var(--border)' }}>
+                        {req.req_id}
+                      </td>
+                    )}
+                    <td style={{ ...TD, fontWeight: 600, textTransform: 'capitalize', color: 'var(--text-muted)' }}>
+                      {d.field.replace('_', ' ')}
+                    </td>
+                    <td style={{ ...TD, color: '#dc2626', textDecoration: 'line-through', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.from}
+                    </td>
+                    <td style={{ ...TD, color: '#16a34a', fontWeight: 600, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.to}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </SECTION>
+      )}
+
+      {/* Link changes */}
+      {(linksAdded.length > 0 || linksRemoved.length > 0) && (
+        <SECTION
+          title="Link Changes"
+          count={linksAdded.length + linksRemoved.length}
+          color="#2563eb" bg="#eff6ff" border="#bfdbfe"
+        >
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>{['Change', 'Source', 'Type', 'Target'].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {linksAdded.map((l, i) => (
+                <tr key={`a${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ ...TD, color: '#16a34a', fontWeight: 700 }}>+ Added</td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{idToReqId[l.source_requirement_id] || l.source_requirement_id}</td>
+                  <td style={TD}>{l.link_type.replace('_', ' ')}</td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{idToReqId[l.target_requirement_id] || l.target_requirement_id}</td>
+                </tr>
+              ))}
+              {linksRemoved.map((l, i) => (
+                <tr key={`r${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ ...TD, color: '#dc2626', fontWeight: 700 }}>− Removed</td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{idToReqId[l.source_requirement_id] || l.source_requirement_id}</td>
+                  <td style={TD}>{l.link_type.replace('_', ' ')}</td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{idToReqId[l.target_requirement_id] || l.target_requirement_id}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </SECTION>
       )}
     </div>
   );
