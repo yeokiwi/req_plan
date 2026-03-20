@@ -13,6 +13,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import ModuleDetailPage from './pages/ModuleDetailPage';
 import TraceabilityPage from './pages/TraceabilityPage';
 import ReportsPage from './pages/ReportsPage';
+import UserGuidePage from './pages/UserGuidePage';
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -42,6 +43,7 @@ function AppRoutes() {
       <Route path="/modules/:id" element={<RequireAuth><ModuleDetailPage /></RequireAuth>} />
       <Route path="/traceability" element={<RequireAuth><TraceabilityPage /></RequireAuth>} />
       <Route path="/reports" element={<RequireAuth><ReportsPage /></RequireAuth>} />
+      <Route path="/guide" element={<RequireAuth><UserGuidePage /></RequireAuth>} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

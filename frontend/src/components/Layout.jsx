@@ -71,6 +71,9 @@ export default function Layout({ children }) {
               <span>👥</span> Users
             </NavLink>
           )}
+          <NavLink to="/guide">
+            <span>📖</span> User Guide
+          </NavLink>
         </nav>
         <div className="sidebar-user">
           <div className="username">{user?.username}</div>
