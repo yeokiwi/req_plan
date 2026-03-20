@@ -62,6 +62,13 @@ export const api = {
   links: {
     list: (params = {}) => request('/requirements/meta/links?' + new URLSearchParams(params)),
   },
+  baselines: {
+    list: (project_id) => request(`/baselines?project_id=${project_id}`),
+    get: (id) => request(`/baselines/${id}`),
+    create: (body) => request('/baselines', { method: 'POST', body: JSON.stringify(body) }),
+    restore: (id) => request(`/baselines/${id}/restore`, { method: 'POST' }),
+    delete: (id) => request(`/baselines/${id}`, { method: 'DELETE' }),
+  },
   export: {
     project: async (id) => {
       const res = await fetch(`${BASE}/projects/${id}/export`, {

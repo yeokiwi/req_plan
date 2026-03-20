@@ -71,6 +71,38 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS baselines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS baseline_requirements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    baseline_id INTEGER NOT NULL REFERENCES baselines(id) ON DELETE CASCADE,
+    requirement_id INTEGER NOT NULL,
+    req_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    priority TEXT NOT NULL DEFAULT 'medium',
+    module_id INTEGER,
+    module_name TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS baseline_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    baseline_id INTEGER NOT NULL REFERENCES baselines(id) ON DELETE CASCADE,
+    source_requirement_id INTEGER NOT NULL,
+    target_requirement_id INTEGER NOT NULL,
+    link_type TEXT NOT NULL DEFAULT 'related'
+  );
+`);
+
 // Migration: add module_id to requirements if not present
 const reqCols = db.prepare('PRAGMA table_info(requirements)').all();
 if (!reqCols.find(c => c.name === 'module_id')) {

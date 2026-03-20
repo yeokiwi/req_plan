@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { api } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 
 const LINK_BG = { related: '#dbeafe', depends_on: '#fef3c7', parent: '#ede9fe', child: '#dcfce7' };
 const LINK_FG = { related: '#1d4ed8', depends_on: '#92400e', parent: '#5b21b6', child: '#15803d' };
@@ -20,7 +21,7 @@ const BADGE = {
 
 export default function ReportsPage() {
   const navigate = useNavigate();
-  const [tab, setTab]             = useState('dependency'); // 'dependency' | 'coverage'
+  const [tab, setTab]             = useState('dependency'); // 'dependency' | 'coverage' | 'baselines'
   const [projects, setProjects]   = useState([]);
   const [allModules, setAllModules] = useState([]);
   const [projectId, setProjectId] = useState('');
@@ -111,7 +112,7 @@ export default function ReportsPage() {
 
         {/* Tab bar */}
         <div style={{ display: 'flex', marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
-          {[['dependency', 'Dependency Matrix'], ['coverage', 'Coverage Report']].map(([key, label]) => (
+          {[['dependency', 'Dependency Matrix'], ['coverage', 'Coverage Report'], ['baselines', 'Baselines']].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -128,30 +129,34 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {/* Scope selector */}
-        <div className="card" style={{ marginBottom: 20, padding: '16px 20px' }}>
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>Project *</label>
-              <select value={projectId} onChange={e => handleProjectChange(e.target.value)}>
-                <option value="">— Select a project —</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>
-                Module <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span>
-              </label>
-              <select value={moduleId} onChange={e => setModuleId(e.target.value)} disabled={!projectId}>
-                <option value="">All modules</option>
-                {visibleModules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+        {/* Scope selector — hidden for Baselines tab (it has its own project picker) */}
+        {tab !== 'baselines' && (
+          <div className="card" style={{ marginBottom: 20, padding: '16px 20px' }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>Project *</label>
+                <select value={projectId} onChange={e => handleProjectChange(e.target.value)}>
+                  <option value="">— Select a project —</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>
+                  Module <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span>
+                </label>
+                <select value={moduleId} onChange={e => setModuleId(e.target.value)} disabled={!projectId}>
+                  <option value="">All modules</option>
+                  {visibleModules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Content */}
-        {noScope ? (
+        {tab === 'baselines' ? (
+          <BaselinesTab projects={projects} />
+        ) : noScope ? (
           <div className="card empty">Select a project above to generate the report.</div>
         ) : loading ? (
           <div className="card empty">Loading…</div>
@@ -406,6 +411,245 @@ function CoverageReport({ requirements, coveredReqs, uncoveredReqs, coveragePct,
         <div className="card empty" style={{ color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }}>
           All requirements have at least one traceability link.
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Baselines Tab ──────────────────────────────────────────────────────────────
+function BaselinesTab({ projects }) {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager';
+
+  const [projectId, setProjectId]   = useState('');
+  const [baselines, setBaselines]   = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [showForm, setShowForm]     = useState(false);
+  const [formName, setFormName]     = useState('');
+  const [formDesc, setFormDesc]     = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [formError, setFormError]   = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+  const [expanded, setExpanded]     = useState(null); // full baseline data
+  const [restoreMsg, setRestoreMsg] = useState({});   // id -> message
+  const [restoring, setRestoring]   = useState(null);
+
+  useEffect(() => {
+    if (!projectId) { setBaselines([]); return; }
+    loadBaselines();
+  }, [projectId]);
+
+  async function loadBaselines() {
+    setLoading(true);
+    try { setBaselines(await api.baselines.list(projectId)); }
+    catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!formName.trim()) { setFormError('Name is required.'); return; }
+    setSaving(true); setFormError('');
+    try {
+      await api.baselines.create({ project_id: projectId, name: formName.trim(), description: formDesc.trim() });
+      setFormName(''); setFormDesc(''); setShowForm(false);
+      await loadBaselines();
+    } catch (err) {
+      setFormError(err.message);
+    } finally { setSaving(false); }
+  }
+
+  async function handleExpand(id) {
+    if (expandedId === id) { setExpandedId(null); setExpanded(null); return; }
+    setExpandedId(id); setExpanded(null);
+    try { setExpanded(await api.baselines.get(id)); }
+    catch (err) { console.error(err); }
+  }
+
+  async function handleRestore(id) {
+    if (!window.confirm('Restore this baseline? Requirements that still exist will be reverted to their snapshot values and links will be restored. New requirements added after the snapshot are not affected.')) return;
+    setRestoring(id);
+    try {
+      const result = await api.baselines.restore(id);
+      setRestoreMsg(prev => ({ ...prev, [id]: result.message }));
+    } catch (err) {
+      setRestoreMsg(prev => ({ ...prev, [id]: `Error: ${err.message}` }));
+    } finally { setRestoring(null); }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm('Delete this baseline? This cannot be undone.')) return;
+    try {
+      await api.baselines.delete(id);
+      if (expandedId === id) { setExpandedId(null); setExpanded(null); }
+      setRestoreMsg(prev => { const n = { ...prev }; delete n[id]; return n; });
+      await loadBaselines();
+    } catch (err) { console.error(err); }
+  }
+
+  const TH_STYLE = {
+    padding: '7px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)',
+    fontWeight: 600, fontSize: 11, color: 'var(--text-muted)',
+    textTransform: 'uppercase', letterSpacing: '.04em', background: '#f8fafc',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Project selector */}
+      <div className="card" style={{ padding: '16px 20px' }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>Project *</label>
+            <select value={projectId} onChange={e => { setProjectId(e.target.value); setShowForm(false); setRestoreMsg({}); }}>
+              <option value="">— Select a project —</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          {projectId && canEdit && (
+            <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>
+              {showForm ? '✕ Cancel' : '+ Create Baseline'}
+            </button>
+          )}
+        </div>
+
+        {/* Create form */}
+        {showForm && (
+          <form onSubmit={handleCreate} style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 520 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>Name *</label>
+                <input
+                  value={formName} onChange={e => setFormName(e.target.value)}
+                  placeholder="e.g. v1.0 Release Baseline"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13 }}>
+                  Description <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span>
+                </label>
+                <textarea
+                  value={formDesc} onChange={e => setFormDesc(e.target.value)}
+                  rows={2} placeholder="What changed, why this snapshot was taken…"
+                  style={{ width: '100%', resize: 'vertical' }}
+                />
+              </div>
+              {formError && <div style={{ color: 'var(--danger)', fontSize: 13 }}>{formError}</div>}
+              <div>
+                <button className="btn btn-primary" type="submit" disabled={saving}>
+                  {saving ? 'Saving…' : '💾 Save Baseline'}
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* Baselines list */}
+      {!projectId ? null : loading ? (
+        <div className="card empty">Loading…</div>
+      ) : baselines.length === 0 ? (
+        <div className="card empty">No baselines saved for this project yet.</div>
+      ) : (
+        baselines.map(b => {
+          const isExpanded = expandedId === b.id;
+          const msg = restoreMsg[b.id];
+          return (
+            <div key={b.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              {/* Header row */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', flexWrap: 'wrap',
+              }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{b.name}</div>
+                  {b.description && (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{b.description}</div>
+                  )}
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 12 }}>
+                    <span>{new Date(b.created_at).toLocaleString()}</span>
+                    <span>by {b.created_by_name}</span>
+                    <span><strong>{b.req_count}</strong> reqs · <strong>{b.link_count}</strong> links</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => handleExpand(b.id)}>
+                    {isExpanded ? '▲ Hide' : '▼ Details'}
+                  </button>
+                  {canEdit && (
+                    <>
+                      <button
+                        className="btn btn-primary" style={{ fontSize: 12 }}
+                        onClick={() => handleRestore(b.id)}
+                        disabled={restoring === b.id}
+                      >
+                        {restoring === b.id ? 'Restoring…' : '↩ Restore'}
+                      </button>
+                      <button
+                        className="btn btn-danger" style={{ fontSize: 12 }}
+                        onClick={() => handleDelete(b.id)}
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Restore result message */}
+              {msg && (
+                <div style={{
+                  margin: '0 16px 12px', padding: '8px 12px', borderRadius: 6,
+                  background: msg.startsWith('Error') ? '#fef2f2' : '#f0fdf4',
+                  color: msg.startsWith('Error') ? '#dc2626' : '#16a34a',
+                  fontSize: 13, border: `1px solid ${msg.startsWith('Error') ? '#fecaca' : '#bbf7d0'}`,
+                }}>
+                  {msg}
+                </div>
+              )}
+
+              {/* Expanded details */}
+              {isExpanded && (
+                <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }}>
+                  {!expanded || expanded.id !== b.id ? (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
+                  ) : expanded.requirements.length === 0 ? (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No requirements in this snapshot.</div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr>
+                          {['ID', 'Title', 'Module', 'Status', 'Priority'].map(h => (
+                            <th key={h} style={TH_STYLE}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {expanded.requirements.map(r => (
+                          <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{r.req_id}</td>
+                            <td style={{ padding: '6px 12px', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</td>
+                            <td style={{ padding: '6px 12px', color: 'var(--text-muted)' }}>{r.module_name || '—'}</td>
+                            <td style={{ padding: '6px 12px' }}>
+                              <span style={{ ...BADGE, background: (STATUS_COLOR[r.status] || '#94a3b8') + '22', color: STATUS_COLOR[r.status] || '#94a3b8' }}>
+                                {r.status}
+                              </span>
+                            </td>
+                            <td style={{ padding: '6px 12px' }}>
+                              <span style={{ ...BADGE, background: (PRIORITY_COLOR[r.priority] || '#94a3b8') + '22', color: PRIORITY_COLOR[r.priority] || '#94a3b8' }}>
+                                {r.priority}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
     </div>
   );
