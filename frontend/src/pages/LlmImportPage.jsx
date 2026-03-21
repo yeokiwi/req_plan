@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Layout from '../components/Layout';
 import { api } from '../api';
 
 export default function LlmImportPage() {
@@ -135,6 +136,7 @@ export default function LlmImportPage() {
   const canSend = hasDoc && input.trim().length > 0 && !sending;
 
   return (
+    <Layout>
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">AI Requirements Import</h1>
@@ -419,5 +421,6 @@ export default function LlmImportPage() {
         </div>
       </div>
     </div>
+    </Layout>
   );
 }
