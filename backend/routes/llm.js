@@ -1,8 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const mammoth = require('mammoth');
-const _pdfParse = require('pdf-parse');
-const pdfParse = _pdfParse.default || _pdfParse;
+const { PDFParse } = require('pdf-parse');
 const OpenAI = require('openai');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
@@ -76,7 +75,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       const result = await mammoth.extractRawText({ buffer: req.file.buffer });
       text = result.value;
     } else if (mime === 'application/pdf') {
-      const result = await pdfParse(req.file.buffer);
+      const parser = new PDFParse({ data: req.file.buffer });
+      const result = await parser.getText();
       text = result.text;
     } else {
       return res.status(400).json({ error: 'Unsupported file type' });
