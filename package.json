@@ -12,6 +12,6 @@
     "start:backend": "npm start --prefix backend",
     "build:frontend": "npm run build --prefix frontend",
     "build": "npm install --prefix backend && npm install --prefix frontend && npm run build:frontend",
-    "start": "node --no-warnings=ExperimentalWarning backend/server.js"
+    "start": "node --experimental-sqlite --no-warnings=ExperimentalWarning backend/server.js"
   }
 }
