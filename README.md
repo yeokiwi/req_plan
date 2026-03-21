@@ -16,6 +16,7 @@ A full-stack web application for managing software requirements, organised into 
 | **Tags** | Colour-coded tags for filtering and categorisation |
 | **User Management** | Admin can create accounts and assign roles (admin / manager / viewer) |
 | **Authentication** | JWT-based login; new users can self-register as viewers |
+| **Wiki Editor** | Per-module and standalone WYSIWYG wiki pages with rich text editing (TipTap), requirement @-mention references, and inline requirement creation |
 | **AI Import** | Upload a Word (.docx) or PDF document; chat with an LLM to extract and refine requirements, then bulk-import them into any module |
 
 ### Role permissions
@@ -23,7 +24,7 @@ A full-stack web application for managing software requirements, organised into 
 | Action | Viewer | Manager | Admin |
 |---|:---:|:---:|:---:|
 | View requirements, projects, matrix | ✓ | ✓ | ✓ |
-| Create / edit requirements, projects, modules | | ✓ | ✓ |
+| Create / edit requirements, projects, modules, wiki pages | | ✓ | ✓ |
 | Manage tags | | ✓ | ✓ |
 | Use AI Import | | ✓ | ✓ |
 | Create user accounts | | | ✓ |
@@ -40,6 +41,7 @@ A full-stack web application for managing software requirements, organised into 
 | Backend | Node.js 22, Express 4 |
 | Database | SQLite via `node:sqlite` (built-in, no compilation required) |
 | Auth | JSON Web Tokens (`jsonwebtoken`) + bcrypt (`bcryptjs`) |
+| Wiki editor | TipTap (ProseMirror-based WYSIWYG) |
 | Word export | `docx` v9 |
 | AI / LLM | `openai` SDK (OpenAI-compatible, configurable base URL) |
 | Document parsing | `mammoth` (.docx), `pdf-parse` (.pdf), `multer` (file upload) |
@@ -124,6 +126,7 @@ req_plan/
 │       ├── modules.js      # Module CRUD + list
 │       ├── users.js        # User management (admin)
 │       ├── export.js       # GET /api/projects/:id/export → .docx
+│       ├── wiki.js          # Wiki page CRUD + per-module + page tree
 │       └── llm.js          # POST /api/llm/upload|chat|import (AI Import)
 ├── frontend/
 │   ├── vite.config.js      # Vite config (proxies /api → :3001 in dev)
@@ -133,7 +136,9 @@ req_plan/
 │       ├── contexts/
 │       │   └── AuthContext.jsx
 │       ├── components/
-│       │   └── Layout.jsx   # Sidebar navigation
+│       │   ├── Layout.jsx   # Sidebar navigation
+│       │   ├── WikiEditor.jsx          # TipTap WYSIWYG editor with @-mentions
+│       │   └── CreateRequirementModal.jsx # Inline requirement creation modal
 │       └── pages/
 │           ├── LoginPage.jsx
 │           ├── RegisterPage.jsx
@@ -146,6 +151,7 @@ req_plan/
 │           ├── TraceabilityPage.jsx
 │           ├── TagsPage.jsx
 │           ├── UsersPage.jsx
+│           ├── WikiPage.jsx
 │           ├── UserGuidePage.jsx
 │           └── LlmImportPage.jsx
 └── package.json            # Root scripts (install:all, dev:*, build, start)
@@ -177,11 +183,38 @@ req_plan/
 | `GET/POST` | `/api/users` | List users / create user (admin) |
 | `PUT` | `/api/users/:id/role` | Change role (admin) |
 | `DELETE` | `/api/users/:id` | Delete user (admin) |
+| `GET/POST` | `/api/wiki-pages` | List (filterable) / create wiki pages |
+| `GET/PUT/DELETE` | `/api/wiki-pages/:id` | Get / update / delete wiki page |
+| `GET` | `/api/wiki-pages/by-module/:moduleId` | Get or auto-create wiki page for a module |
+| `GET` | `/api/wiki-pages/tree/:projectId` | Get page tree for standalone wiki section |
 | `POST` | `/api/llm/upload` | Parse a `.docx` or `.pdf` to plain text (manager+) |
 | `POST` | `/api/llm/chat` | Send a message to the LLM with conversation history (manager+) |
 | `POST` | `/api/llm/import` | Bulk-insert extracted requirements into a module (manager+) |
 
 All endpoints except `/api/auth/login` and `/api/auth/register` require a `Bearer` token in the `Authorization` header.
+
+---
+
+## Wiki Editor
+
+The **Wiki** feature provides a WYSIWYG rich-text editor for documenting modules and projects, with deep integration into the requirement management system.
+
+### Per-module wiki
+
+Each module automatically gets a wiki page, accessible via the **Wiki** tab on the module detail page. Use it to document the module's purpose, design decisions, interfaces, and constraints. Content auto-saves as you type.
+
+### Standalone wiki section
+
+The **Wiki** sidebar item opens a project-scoped wiki with a hierarchical page tree. Create top-level pages and nested sub-pages to organise cross-cutting documentation (architecture, standards, glossary, etc.).
+
+### Requirement references
+
+- **@-mention autocomplete** — Type `@` in the editor to search requirements by ID or title. Select one to insert a clickable reference badge (e.g. `REQ-0001`) that links directly to the requirement detail page.
+- **Inline requirement creation** — Select text in the editor, then click **+ Req** in the floating toolbar to create a new requirement with the selected text as the title. The text is automatically replaced with a reference to the newly created requirement.
+
+### Editor features
+
+The TipTap-based editor supports: headings (H1–H3), bold, italic, strikethrough, inline code, bullet and ordered lists, blockquotes, code blocks, horizontal rules, tables, undo/redo.
 
 ---
 
