@@ -106,8 +106,10 @@ Password: admin123
 
 ```
 req_plan/
+├── railway.toml            # Railway deployment configuration
+├── .env.example            # Environment variable template
 ├── backend/
-│   ├── server.js           # Express app entry point
+│   ├── server.js           # Express app entry point (also serves frontend/dist in production)
 │   ├── database.js         # SQLite schema, migrations, seed
 │   ├── middleware/
 │   │   └── auth.js         # JWT authentication + role guards
@@ -119,7 +121,7 @@ req_plan/
 │       ├── users.js        # User management (admin)
 │       └── export.js       # GET /api/projects/:id/export → .docx
 ├── frontend/
-│   ├── vite.config.js      # Vite config (proxies /api → :3001)
+│   ├── vite.config.js      # Vite config (proxies /api → :3001 in dev)
 │   └── src/
 │       ├── App.jsx          # Routes
 │       ├── api.js           # API client (all fetch calls)
@@ -138,8 +140,9 @@ req_plan/
 │           ├── RequirementDetailPage.jsx
 │           ├── TraceabilityPage.jsx
 │           ├── TagsPage.jsx
-│           └── UsersPage.jsx
-└── package.json            # Root scripts (install:all, dev:backend, dev:frontend)
+│           ├── UsersPage.jsx
+│           └── UserGuidePage.jsx
+└── package.json            # Root scripts (install:all, dev:*, build, start)
 ```
 
 ---
@@ -182,7 +185,7 @@ npm run build:frontend
 # Output: frontend/dist/
 ```
 
-Serve the `frontend/dist/` folder with any static file server, and ensure `/api` requests are proxied to the backend.
+When `frontend/dist/` is present, the backend automatically detects and serves it as a static site — no separate static file server or proxy is needed.
 
 To run the backend in production mode:
 
@@ -192,14 +195,74 @@ npm run start:backend
 
 ---
 
-## Environment Variables
+## Deploying to Railway
 
-The backend reads the following optional environment variables:
+[Railway](https://railway.com) can host the full stack as a **single service** — the backend builds and serves the frontend automatically.
+
+### 1. Push your code to GitHub
+
+Ensure your repository is pushed to GitHub (or GitLab / Bitbucket).
+
+### 2. Create a new Railway project
+
+1. Go to [railway.com](https://railway.com) and sign in.
+2. Click **New Project → Deploy from GitHub repo**.
+3. Select your repository. Railway will detect the `railway.toml` configuration automatically.
+
+### 3. Set environment variables
+
+In your Railway service, open **Variables** and add:
+
+| Variable | Value |
+|---|---|
+| `JWT_SECRET` | A long random string (see below) |
+
+Generate a secure secret:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+> Railway sets `PORT` automatically — do **not** override it.
+
+### 4. Deploy
+
+Railway will run the build command, then start the server. Once the deployment is green, click the generated **public URL** to open ReqPlan.
+
+The build process:
+1. Installs backend dependencies (`npm install --prefix backend`)
+2. Installs frontend dependencies (`npm install --prefix frontend`)
+3. Builds the React app (`npm run build:frontend` → `frontend/dist/`)
+4. Starts the Express server, which serves both the API and the built frontend
+
+### 5. Persistent storage (SQLite)
+
+Railway's filesystem is **ephemeral** by default — the SQLite database (`backend/data.db`) will be reset on each redeploy. For a persistent database, add a **Railway Volume**:
+
+1. In your service, go to **Settings → Volumes**.
+2. Click **Add Volume** and mount it to `/app/backend`.
+3. This directory persists across deploys and restarts.
+
+> Without a Volume, data resets on every deploy. A Volume is strongly recommended for production use.
+
+### Re-deploying updates
+
+Push new commits to your connected branch — Railway will automatically rebuild and redeploy.
+
+---
+
+## Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `3001` | Backend listening port |
-| `JWT_SECRET` | `req-plan-secret-change-in-production` | JWT signing secret |
+| `PORT` | `3001` | Backend listening port (set automatically by Railway) |
+| `JWT_SECRET` | `req-plan-secret-change-in-production` | JWT signing secret — **must** be changed in production |
+
+Copy `.env.example` to `.env` for local development:
+
+```bash
+cp .env.example .env
+# then edit .env with your values
+```
 
 Set `JWT_SECRET` to a long random string in production:
 
