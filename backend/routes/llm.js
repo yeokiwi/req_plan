@@ -1,7 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const mammoth = require('mammoth');
-const pdfParse = require('pdf-parse');
+const _pdfParse = require('pdf-parse');
+const pdfParse = _pdfParse.default || _pdfParse;
 const OpenAI = require('openai');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
