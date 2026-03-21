@@ -18,6 +18,7 @@ app.use('/api/modules', require('./routes/modules'));
 app.use('/api/projects', require('./routes/export'));
 app.use('/api/baselines', require('./routes/baselines'));
 app.use('/api/llm', require('./routes/llm'));
+app.use('/api/wiki-pages', require('./routes/wiki'));
 
 // Serve built frontend in production (e.g. Railway deployment)
 const distPath = path.join(__dirname, '../frontend/dist');

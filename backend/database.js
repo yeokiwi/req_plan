@@ -103,6 +103,25 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS wiki_pages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT DEFAULT '{}',
+    module_id INTEGER,
+    project_id INTEGER,
+    parent_page_id INTEGER,
+    slug TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    updated_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_page_id) REFERENCES wiki_pages(id) ON DELETE SET NULL
+  );
+`);
+
 // Migration: add module_id to requirements if not present
 const reqCols = db.prepare('PRAGMA table_info(requirements)').all();
 if (!reqCols.find(c => c.name === 'module_id')) {

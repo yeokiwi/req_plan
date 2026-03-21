@@ -58,6 +58,9 @@ export default function Layout({ children }) {
           <NavLink to="/traceability">
             <span>🔗</span> Traceability
           </NavLink>
+          <NavLink to="/wiki">
+            <span>📝</span> Wiki
+          </NavLink>
           <NavLink to="/reports">
             <span>📈</span> Reports
           </NavLink>

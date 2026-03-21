@@ -80,6 +80,15 @@ export const api = {
       return res.blob();
     },
   },
+  wiki: {
+    list: (params = {}) => request('/wiki-pages?' + new URLSearchParams(params)),
+    get: (id) => request(`/wiki-pages/${id}`),
+    getByModule: (moduleId) => request(`/wiki-pages/by-module/${moduleId}`),
+    getTree: (projectId) => request(`/wiki-pages/tree/${projectId}`),
+    create: (body) => request('/wiki-pages', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id, body) => request(`/wiki-pages/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    delete: (id) => request(`/wiki-pages/${id}`, { method: 'DELETE' }),
+  },
   llm: {
     upload: async (file) => {
       const formData = new FormData();
