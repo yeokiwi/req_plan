@@ -138,6 +138,7 @@ router.post('/chat', express.json(), async (req, res) => {
 
 // POST /api/llm/import — bulk insert requirements into a module
 router.post('/import', express.json(), (req, res) => {
+  try {
   const { module_id, requirements } = req.body;
   if (!module_id) return res.status(400).json({ error: 'module_id is required' });
   if (!Array.isArray(requirements) || requirements.length === 0) {
@@ -153,7 +154,8 @@ router.post('/import', express.json(), (req, res) => {
   `);
 
   const imported = [];
-  const insertMany = db.transaction(() => {
+  db.exec('BEGIN');
+  try {
     for (const r of requirements) {
       const title = String(r.title || '').trim();
       if (!title) continue;
@@ -169,10 +171,16 @@ router.post('/import', express.json(), (req, res) => {
       );
       imported.push({ id: Number(result.lastInsertRowid), req_id, title });
     }
-  });
-
-  insertMany();
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
   res.status(201).json({ imported: imported.length, requirements: imported });
+  } catch (err) {
+    console.error('LLM import error:', err);
+    res.status(500).json({ error: err.message || 'Import failed' });
+  }
 });
 
 module.exports = router;
