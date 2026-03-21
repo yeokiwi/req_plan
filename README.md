@@ -16,6 +16,7 @@ A full-stack web application for managing software requirements, organised into 
 | **Tags** | Colour-coded tags for filtering and categorisation |
 | **User Management** | Admin can create accounts and assign roles (admin / manager / viewer) |
 | **Authentication** | JWT-based login; new users can self-register as viewers |
+| **AI Import** | Upload a Word (.docx) or PDF document; chat with an LLM to extract and refine requirements, then bulk-import them into any module |
 
 ### Role permissions
 
@@ -24,6 +25,7 @@ A full-stack web application for managing software requirements, organised into 
 | View requirements, projects, matrix | ✓ | ✓ | ✓ |
 | Create / edit requirements, projects, modules | | ✓ | ✓ |
 | Manage tags | | ✓ | ✓ |
+| Use AI Import | | ✓ | ✓ |
 | Create user accounts | | | ✓ |
 | Change user roles / delete users | | | ✓ |
 | Delete tags | | | ✓ |
@@ -39,6 +41,8 @@ A full-stack web application for managing software requirements, organised into 
 | Database | SQLite via `node:sqlite` (built-in, no compilation required) |
 | Auth | JSON Web Tokens (`jsonwebtoken`) + bcrypt (`bcryptjs`) |
 | Word export | `docx` v9 |
+| AI / LLM | `openai` SDK (OpenAI-compatible, configurable base URL) |
+| Document parsing | `mammoth` (.docx), `pdf-parse` (.pdf), `multer` (file upload) |
 
 ---
 
@@ -119,7 +123,8 @@ req_plan/
 │       ├── projects.js     # Project CRUD + module creation
 │       ├── modules.js      # Module CRUD + list
 │       ├── users.js        # User management (admin)
-│       └── export.js       # GET /api/projects/:id/export → .docx
+│       ├── export.js       # GET /api/projects/:id/export → .docx
+│       └── llm.js          # POST /api/llm/upload|chat|import (AI Import)
 ├── frontend/
 │   ├── vite.config.js      # Vite config (proxies /api → :3001 in dev)
 │   └── src/
@@ -141,7 +146,8 @@ req_plan/
 │           ├── TraceabilityPage.jsx
 │           ├── TagsPage.jsx
 │           ├── UsersPage.jsx
-│           └── UserGuidePage.jsx
+│           ├── UserGuidePage.jsx
+│           └── LlmImportPage.jsx
 └── package.json            # Root scripts (install:all, dev:*, build, start)
 ```
 
@@ -171,8 +177,49 @@ req_plan/
 | `GET/POST` | `/api/users` | List users / create user (admin) |
 | `PUT` | `/api/users/:id/role` | Change role (admin) |
 | `DELETE` | `/api/users/:id` | Delete user (admin) |
+| `POST` | `/api/llm/upload` | Parse a `.docx` or `.pdf` to plain text (manager+) |
+| `POST` | `/api/llm/chat` | Send a message to the LLM with conversation history (manager+) |
+| `POST` | `/api/llm/import` | Bulk-insert extracted requirements into a module (manager+) |
 
 All endpoints except `/api/auth/login` and `/api/auth/register` require a `Bearer` token in the `Authorization` header.
+
+---
+
+## AI Import
+
+The **AI Import** feature (accessible via the sidebar for managers and admins) lets you populate a module with requirements extracted from an existing document.
+
+### How it works
+
+1. Navigate to **AI Import** in the sidebar.
+2. Select the target **project** and **module**.
+3. Upload a `.docx` or `.pdf` file (max 50 MB).
+4. The document is parsed server-side and sent to the LLM, which extracts structured requirements automatically.
+5. Chat with the AI to refine, add, or remove requirements from the list.
+6. When satisfied, say something like *"import these"* — the AI will return a finalised JSON list.
+7. Review the editable requirements table (adjust titles, descriptions, priorities, or statuses).
+8. Click **Import N requirements** to bulk-insert them into the selected module.
+
+### Configuration
+
+The AI Import uses any **OpenAI-compatible API**. Configure it via `backend/.env`:
+
+```env
+LLM_BASE_URL=https://api.openai.com/v1   # or any compatible endpoint
+LLM_API_KEY=your-api-key-here
+LLM_MODEL=gpt-4o                          # or any model the provider supports
+```
+
+Supported providers include OpenAI, Groq, Together AI, LM Studio, Ollama (with OpenAI-compatible mode), and others. If `LLM_API_KEY` is not set, the upload and chat endpoints return a `503` error with a clear message.
+
+### Supported file formats
+
+| Format | Extension | Notes |
+|--------|-----------|-------|
+| Word (Open XML) | `.docx` | Full text extraction via `mammoth` |
+| PDF | `.pdf` | Text extraction via `pdf-parse`; scanned/image-only PDFs return no text |
+
+> Old binary Word format (`.doc`) is not supported. Save as `.docx` first.
 
 ---
 
@@ -216,8 +263,11 @@ In your Railway service, open **Variables** and add:
 | Variable | Value |
 |---|---|
 | `JWT_SECRET` | A long random string (see below) |
+| `LLM_BASE_URL` | Base URL of your LLM provider (e.g. `https://api.openai.com/v1`) |
+| `LLM_API_KEY` | Your LLM provider API key |
+| `LLM_MODEL` | Model name (e.g. `gpt-4o`) |
 
-Generate a secure secret:
+Generate a secure JWT secret:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
@@ -256,12 +306,18 @@ Push new commits to your connected branch — Railway will automatically rebuild
 |---|---|---|
 | `PORT` | `3001` | Backend listening port (set automatically by Railway) |
 | `JWT_SECRET` | `req-plan-secret-change-in-production` | JWT signing secret — **must** be changed in production |
+| `LLM_BASE_URL` | `https://api.openai.com/v1` | Base URL for any OpenAI-compatible API (OpenAI, Groq, Together AI, LM Studio, etc.) |
+| `LLM_API_KEY` | *(none)* | API key for the LLM provider |
+| `LLM_MODEL` | `gpt-4o` | Model name to use (must be supported by the configured provider) |
 
-Copy `.env.example` to `.env` for local development:
+Create `backend/.env` for local development:
 
 ```bash
-cp .env.example .env
-# then edit .env with your values
+# backend/.env
+JWT_SECRET=your-long-random-secret
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=your-api-key-here
+LLM_MODEL=gpt-4o
 ```
 
 Set `JWT_SECRET` to a long random string in production:
