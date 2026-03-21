@@ -62,6 +62,11 @@ export default function Layout({ children }) {
             <span>📈</span> Reports
           </NavLink>
           {(user?.role === 'admin' || user?.role === 'manager') && (
+            <NavLink to="/llm-import">
+              <span>✨</span> AI Import
+            </NavLink>
+          )}
+          {(user?.role === 'admin' || user?.role === 'manager') && (
             <NavLink to="/tags">
               <span>🏷️</span> Tags
             </NavLink>

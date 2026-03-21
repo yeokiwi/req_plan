@@ -6,3 +6,4 @@ backend/data.db-shm
 backend/data.db-wal
 dist/
 .env
+backend/.env

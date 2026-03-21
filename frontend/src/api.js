@@ -80,4 +80,21 @@ export const api = {
       return res.blob();
     },
   },
+  llm: {
+    upload: async (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = getToken();
+      const res = await fetch(`${BASE}/llm/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    },
+    chat: (messages) => request('/llm/chat', { method: 'POST', body: JSON.stringify({ messages }) }),
+    import: (module_id, requirements) => request('/llm/import', { method: 'POST', body: JSON.stringify({ module_id, requirements }) }),
+  },
 };

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -16,6 +17,7 @@ app.use('/api/projects', require('./routes/projects'));
 app.use('/api/modules', require('./routes/modules'));
 app.use('/api/projects', require('./routes/export'));
 app.use('/api/baselines', require('./routes/baselines'));
+app.use('/api/llm', require('./routes/llm'));
 
 // Serve built frontend in production (e.g. Railway deployment)
 const distPath = path.join(__dirname, '../frontend/dist');
