@@ -1,14 +1,38 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Mention from '@tiptap/extension-mention';
-import Link from '@tiptap/extension-link';
-import Placeholder from '@tiptap/extension-placeholder';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { TableHeader } from '@tiptap/extension-table-header';
+import { RichTextProvider } from 'reactjs-tiptap-editor';
+import 'reactjs-tiptap-editor/style.css';
+
+// Base extensions
+import Document from '@tiptap/extension-document';
+import Text from '@tiptap/extension-text';
+import Paragraph from '@tiptap/extension-paragraph';
+import HardBreak from '@tiptap/extension-hard-break';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { ListItem } from '@tiptap/extension-list-item';
+import { Dropcursor, Gapcursor, Placeholder, TrailingNode } from '@tiptap/extensions';
+
+// Feature extensions from reactjs-tiptap-editor
+import { Bold, RichTextBold } from 'reactjs-tiptap-editor/bold';
+import { Italic, RichTextItalic } from 'reactjs-tiptap-editor/italic';
+import { TextUnderline, RichTextUnderline } from 'reactjs-tiptap-editor/textunderline';
+import { Strike, RichTextStrike } from 'reactjs-tiptap-editor/strike';
+import { Code, RichTextCode } from 'reactjs-tiptap-editor/code';
+import { Heading, RichTextHeading } from 'reactjs-tiptap-editor/heading';
+import { BulletList, RichTextBulletList } from 'reactjs-tiptap-editor/bulletlist';
+import { OrderedList, RichTextOrderedList } from 'reactjs-tiptap-editor/orderedlist';
+import { Blockquote, RichTextBlockquote } from 'reactjs-tiptap-editor/blockquote';
+import { HorizontalRule, RichTextHorizontalRule } from 'reactjs-tiptap-editor/horizontalrule';
+import { CodeBlock, RichTextCodeBlock } from 'reactjs-tiptap-editor/codeblock';
+import { Table, RichTextTable } from 'reactjs-tiptap-editor/table';
+import { Link, RichTextLink } from 'reactjs-tiptap-editor/link';
+import { History, RichTextUndo, RichTextRedo } from 'reactjs-tiptap-editor/history';
+import { Mention } from 'reactjs-tiptap-editor/mention';
+
+// Bubble menus
+import { RichTextBubbleText, RichTextBubbleLink, RichTextBubbleTable } from 'reactjs-tiptap-editor/bubble';
+
 import { api } from '../api';
 
 // Hook for mention suggestion state management
@@ -100,11 +124,10 @@ function useMentionSuggestion() {
   return { suggestion, SuggestionDropdown };
 }
 
-// Custom floating bubble menu on text selection
-function FloatingBubbleMenu({ editor, onCreateRequirement }) {
+// Custom floating bubble menu for "+ Req" creation
+function FloatingReqMenu({ editor, onCreateRequirement }) {
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
-  const menuRef = useRef(null);
 
   useEffect(() => {
     if (!editor) return;
@@ -115,7 +138,6 @@ function FloatingBubbleMenu({ editor, onCreateRequirement }) {
         setVisible(false);
         return;
       }
-      // Get bounding rect of selection
       const coords = editor.view.coordsAtPos(from);
       const endCoords = editor.view.coordsAtPos(to);
       const top = coords.top - 40;
@@ -131,39 +153,31 @@ function FloatingBubbleMenu({ editor, onCreateRequirement }) {
     };
   }, [editor]);
 
-  if (!visible || !editor) return null;
+  if (!visible || !editor || !onCreateRequirement) return null;
 
   return (
-    <div className="bubble-menu" ref={menuRef} style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-50%)', zIndex: 50 }}>
-      <button onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }} className={editor.isActive('bold') ? 'active' : ''}><b>B</b></button>
-      <button onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }} className={editor.isActive('italic') ? 'active' : ''}><i>I</i></button>
-      <button onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }} className={editor.isActive('strike') ? 'active' : ''}><s>S</s></button>
-      {onCreateRequirement && (
-        <>
-          <div className="toolbar-separator" />
-          <button
-            className="btn-create-req"
-            onMouseDown={e => {
-              e.preventDefault();
-              const { from, to } = editor.state.selection;
-              const selectedText = editor.state.doc.textBetween(from, to, ' ');
-              if (selectedText.trim()) {
-                onCreateRequirement(selectedText.trim(), (req) => {
-                  editor.chain().focus()
-                    .deleteRange({ from, to })
-                    .insertContent({
-                      type: 'mention',
-                      attrs: { id: String(req.id), label: req.req_id },
-                    })
-                    .run();
-                });
-              }
-            }}
-          >
-            + Req
-          </button>
-        </>
-      )}
+    <div className="bubble-menu floating-req-menu" style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-50%)', zIndex: 50 }}>
+      <button
+        className="btn-create-req"
+        onMouseDown={e => {
+          e.preventDefault();
+          const { from, to } = editor.state.selection;
+          const selectedText = editor.state.doc.textBetween(from, to, ' ');
+          if (selectedText.trim()) {
+            onCreateRequirement(selectedText.trim(), (req) => {
+              editor.chain().focus()
+                .deleteRange({ from, to })
+                .insertContent({
+                  type: 'mention',
+                  attrs: { id: String(req.id), label: req.req_id },
+                })
+                .run();
+            });
+          }
+        }}
+      >
+        + Req
+      </button>
     </div>
   );
 }
@@ -172,28 +186,60 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
   const navigate = useNavigate();
   const { suggestion, SuggestionDropdown } = useMentionSuggestion();
 
+  const extensions = [
+    // Base extensions
+    Document,
+    Text,
+    Paragraph,
+    Dropcursor,
+    Gapcursor,
+    HardBreak,
+    TextStyle,
+    ListItem,
+    TrailingNode,
+    Placeholder.configure({
+      placeholder: placeholder || 'Start writing... Use @ to reference requirements',
+    }),
+
+    // Formatting
+    Bold,
+    Italic,
+    TextUnderline,
+    Strike,
+    Code,
+    Heading.configure({ levels: [1, 2, 3] }),
+
+    // Lists
+    BulletList,
+    OrderedList,
+
+    // Block
+    Blockquote,
+    HorizontalRule,
+    CodeBlock,
+
+    // Table
+    Table.configure({ resizable: false }),
+
+    // Link
+    Link.configure({
+      openOnClick: false,
+      HTMLAttributes: { class: 'wiki-link' },
+    }),
+
+    // History
+    History,
+
+    // Mention (requirement references)
+    Mention.configure({
+      HTMLAttributes: { class: 'req-mention' },
+      suggestion,
+      renderLabel: ({ node }) => node.attrs.label || node.attrs.id,
+    }),
+  ];
+
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { class: 'wiki-link' },
-      }),
-      Placeholder.configure({
-        placeholder: placeholder || 'Start writing... Use @ to reference requirements',
-      }),
-      Table.configure({ resizable: false }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      Mention.configure({
-        HTMLAttributes: { class: 'req-mention' },
-        suggestion,
-        renderLabel: ({ node }) => node.attrs.label || node.attrs.id,
-      }),
-    ],
+    extensions,
     content: parseContent(content),
     editable: !readOnly,
     onUpdate: ({ editor }) => {
@@ -235,49 +281,59 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
   if (!editor) return null;
 
   return (
-    <div className="wiki-editor">
-      {!readOnly && (
-        <div className="wiki-toolbar">
-          <div className="toolbar-group">
-            <button onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'active' : ''} title="Bold"><b>B</b></button>
-            <button onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'active' : ''} title="Italic"><i>I</i></button>
-            <button onClick={() => editor.chain().focus().toggleStrike().run()} className={editor.isActive('strike') ? 'active' : ''} title="Strikethrough"><s>S</s></button>
-            <button onClick={() => editor.chain().focus().toggleCode().run()} className={editor.isActive('code') ? 'active' : ''} title="Inline Code">&lt;/&gt;</button>
+    <RichTextProvider editor={editor}>
+      <div className="wiki-editor">
+        {!readOnly && (
+          <div className="wiki-toolbar">
+            <div className="toolbar-group">
+              <RichTextBold />
+              <RichTextItalic />
+              <RichTextUnderline />
+              <RichTextStrike />
+              <RichTextCode />
+            </div>
+            <div className="toolbar-separator" />
+            <div className="toolbar-group">
+              <RichTextHeading />
+            </div>
+            <div className="toolbar-separator" />
+            <div className="toolbar-group">
+              <RichTextBulletList />
+              <RichTextOrderedList />
+            </div>
+            <div className="toolbar-separator" />
+            <div className="toolbar-group">
+              <RichTextBlockquote />
+              <RichTextCodeBlock />
+              <RichTextHorizontalRule />
+            </div>
+            <div className="toolbar-separator" />
+            <div className="toolbar-group">
+              <RichTextTable />
+              <RichTextLink />
+            </div>
+            <div className="toolbar-separator" />
+            <div className="toolbar-group">
+              <RichTextUndo />
+              <RichTextRedo />
+            </div>
           </div>
-          <div className="toolbar-separator" />
-          <div className="toolbar-group">
-            <button onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={editor.isActive('heading', { level: 1 }) ? 'active' : ''} title="Heading 1">H1</button>
-            <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={editor.isActive('heading', { level: 2 }) ? 'active' : ''} title="Heading 2">H2</button>
-            <button onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={editor.isActive('heading', { level: 3 }) ? 'active' : ''} title="Heading 3">H3</button>
-          </div>
-          <div className="toolbar-separator" />
-          <div className="toolbar-group">
-            <button onClick={() => editor.chain().focus().toggleBulletList().run()} className={editor.isActive('bulletList') ? 'active' : ''} title="Bullet List">&#8226; List</button>
-            <button onClick={() => editor.chain().focus().toggleOrderedList().run()} className={editor.isActive('orderedList') ? 'active' : ''} title="Ordered List">1. List</button>
-          </div>
-          <div className="toolbar-separator" />
-          <div className="toolbar-group">
-            <button onClick={() => editor.chain().focus().toggleBlockquote().run()} className={editor.isActive('blockquote') ? 'active' : ''} title="Blockquote">&ldquo;</button>
-            <button onClick={() => editor.chain().focus().toggleCodeBlock().run()} className={editor.isActive('codeBlock') ? 'active' : ''} title="Code Block">{'{ }'}</button>
-            <button onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal Rule">&mdash;</button>
-          </div>
-          <div className="toolbar-separator" />
-          <div className="toolbar-group">
-            <button onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert Table">Table</button>
-          </div>
-          <div className="toolbar-separator" />
-          <div className="toolbar-group">
-            <button onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">&#x21B6;</button>
-            <button onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Redo">&#x21B7;</button>
-          </div>
-        </div>
-      )}
+        )}
 
-      {!readOnly && <FloatingBubbleMenu editor={editor} onCreateRequirement={onCreateRequirement} />}
+        <EditorContent editor={editor} className="wiki-editor-content" />
 
-      <EditorContent editor={editor} className="wiki-editor-content" />
-      {SuggestionDropdown}
-    </div>
+        {!readOnly && (
+          <>
+            <RichTextBubbleText />
+            <RichTextBubbleLink />
+            <RichTextBubbleTable />
+            <FloatingReqMenu editor={editor} onCreateRequirement={onCreateRequirement} />
+          </>
+        )}
+
+        {SuggestionDropdown}
+      </div>
+    </RichTextProvider>
   );
 }
 

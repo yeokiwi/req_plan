@@ -41,7 +41,7 @@ A full-stack web application for managing software requirements, organised into 
 | Backend | Node.js 22, Express 4 |
 | Database | SQLite via `node:sqlite` (built-in, no compilation required) |
 | Auth | JSON Web Tokens (`jsonwebtoken`) + bcrypt (`bcryptjs`) |
-| Wiki editor | TipTap (ProseMirror-based WYSIWYG) |
+| Wiki editor | `reactjs-tiptap-editor` (TipTap/ProseMirror-based WYSIWYG with shadcn components) |
 | Word export | `docx` v9 |
 | AI / LLM | `openai` SDK (OpenAI-compatible, configurable base URL) |
 | Document parsing | `mammoth` (.docx), `pdf-parse` (.pdf), `multer` (file upload) |
