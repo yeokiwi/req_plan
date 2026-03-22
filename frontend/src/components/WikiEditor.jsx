@@ -280,7 +280,7 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
     LineHeight,
 
     // Structure
-    Heading.configure({ levels: [1, 2, 3] }),
+    Heading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
     TextAlign.configure({ alignments: ['left', 'center', 'right', 'justify'] }),
     Indent,
 
