@@ -13,25 +13,84 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { ListItem } from '@tiptap/extension-list-item';
 import { Dropcursor, Gapcursor, Placeholder, TrailingNode } from '@tiptap/extensions';
 
-// Feature extensions from reactjs-tiptap-editor
+// --- Text formatting ---
 import { Bold, RichTextBold } from 'reactjs-tiptap-editor/bold';
 import { Italic, RichTextItalic } from 'reactjs-tiptap-editor/italic';
 import { TextUnderline, RichTextUnderline } from 'reactjs-tiptap-editor/textunderline';
 import { Strike, RichTextStrike } from 'reactjs-tiptap-editor/strike';
 import { Code, RichTextCode } from 'reactjs-tiptap-editor/code';
+import { Color, RichTextColor } from 'reactjs-tiptap-editor/color';
+import { Highlight, RichTextHighlight } from 'reactjs-tiptap-editor/highlight';
+import { MoreMark, RichTextMoreMark } from 'reactjs-tiptap-editor/moremark';
+import { Clear, RichTextClear } from 'reactjs-tiptap-editor/clear';
+import { FontFamily, RichTextFontFamily } from 'reactjs-tiptap-editor/fontfamily';
+import { FontSize, RichTextFontSize } from 'reactjs-tiptap-editor/fontsize';
+import { LineHeight, RichTextLineHeight } from 'reactjs-tiptap-editor/lineheight';
+
+// --- Structure ---
 import { Heading, RichTextHeading } from 'reactjs-tiptap-editor/heading';
+import { TextAlign, RichTextAlign } from 'reactjs-tiptap-editor/textalign';
+import { Indent, RichTextIndent } from 'reactjs-tiptap-editor/indent';
+
+// --- Lists ---
 import { BulletList, RichTextBulletList } from 'reactjs-tiptap-editor/bulletlist';
 import { OrderedList, RichTextOrderedList } from 'reactjs-tiptap-editor/orderedlist';
+import { TaskList, RichTextTaskList } from 'reactjs-tiptap-editor/tasklist';
+
+// --- Block elements ---
 import { Blockquote, RichTextBlockquote } from 'reactjs-tiptap-editor/blockquote';
 import { HorizontalRule, RichTextHorizontalRule } from 'reactjs-tiptap-editor/horizontalrule';
 import { CodeBlock, RichTextCodeBlock } from 'reactjs-tiptap-editor/codeblock';
-import { Table, RichTextTable } from 'reactjs-tiptap-editor/table';
-import { Link, RichTextLink } from 'reactjs-tiptap-editor/link';
-import { History, RichTextUndo, RichTextRedo } from 'reactjs-tiptap-editor/history';
-import { Mention } from 'reactjs-tiptap-editor/mention';
+import { Callout, RichTextCallout } from 'reactjs-tiptap-editor/callout';
 
-// Bubble menus
-import { RichTextBubbleText, RichTextBubbleLink, RichTextBubbleTable } from 'reactjs-tiptap-editor/bubble';
+// --- Table ---
+import { Table, RichTextTable } from 'reactjs-tiptap-editor/table';
+
+// --- Link ---
+import { Link, RichTextLink } from 'reactjs-tiptap-editor/link';
+
+// --- Media ---
+import { Image, RichTextImage } from 'reactjs-tiptap-editor/image';
+import { Video, RichTextVideo } from 'reactjs-tiptap-editor/video';
+import { Iframe, RichTextIframe } from 'reactjs-tiptap-editor/iframe';
+
+// --- Advanced / Diagrams / Math ---
+import { Katex, RichTextKatex } from 'reactjs-tiptap-editor/katex';
+import { Mermaid, RichTextMermaid } from 'reactjs-tiptap-editor/mermaid';
+import { Excalidraw, RichTextExcalidraw } from 'reactjs-tiptap-editor/excalidraw';
+import { Emoji, RichTextEmoji } from 'reactjs-tiptap-editor/emoji';
+
+// --- Document operations ---
+import { ExportPdf, RichTextExportPdf } from 'reactjs-tiptap-editor/exportpdf';
+import { ExportWord, RichTextExportWord } from 'reactjs-tiptap-editor/exportword';
+import { ImportWord, RichTextImportWord } from 'reactjs-tiptap-editor/importword';
+
+// --- Utility ---
+import { History, RichTextUndo, RichTextRedo } from 'reactjs-tiptap-editor/history';
+import { SearchAndReplace, RichTextSearchAndReplace } from 'reactjs-tiptap-editor/searchandreplace';
+import { SlashCommand, SlashCommandList } from 'reactjs-tiptap-editor/slashcommand';
+import { Mention } from 'reactjs-tiptap-editor/mention';
+import { MarkdownPaste } from 'reactjs-tiptap-editor/markdownpaste';
+import { Column, ColumnNode, MultipleColumnNode, RichTextColumn } from 'reactjs-tiptap-editor/column';
+
+// --- Bubble menus ---
+import {
+  RichTextBubbleText,
+  RichTextBubbleLink,
+  RichTextBubbleTable,
+  RichTextBubbleImage,
+  RichTextBubbleVideo,
+  RichTextBubbleKatex,
+  RichTextBubbleMermaid,
+  RichTextBubbleExcalidraw,
+  RichTextBubbleCallout,
+  RichTextBubbleColumns,
+  RichTextBubbleIframe,
+} from 'reactjs-tiptap-editor/bubble';
+
+// Code block syntax highlighting
+import 'prism-code-editor-lightweight/layout.css';
+import 'prism-code-editor-lightweight/themes/github-dark.css';
 
 import { api } from '../api';
 
@@ -182,13 +241,18 @@ function FloatingReqMenu({ editor, onCreateRequirement }) {
   );
 }
 
+// Use Document extension that supports columns
+const DocumentWithColumns = Document.extend({
+  content: '(block|columns)+',
+});
+
 export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequirement, placeholder }) {
   const navigate = useNavigate();
   const { suggestion, SuggestionDropdown } = useMentionSuggestion();
 
   const extensions = [
     // Base extensions
-    Document,
+    DocumentWithColumns,
     Text,
     Paragraph,
     Dropcursor,
@@ -198,28 +262,41 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
     ListItem,
     TrailingNode,
     Placeholder.configure({
-      placeholder: placeholder || 'Start writing... Use @ to reference requirements',
+      placeholder: placeholder || 'Start writing... Type "/" for commands, "@" to mention requirements',
     }),
 
-    // Formatting
+    // Text formatting
     Bold,
     Italic,
     TextUnderline,
     Strike,
     Code,
+    Color,
+    Highlight,
+    MoreMark,
+    Clear,
+    FontFamily,
+    FontSize,
+    LineHeight,
+
+    // Structure
     Heading.configure({ levels: [1, 2, 3] }),
+    TextAlign.configure({ alignments: ['left', 'center', 'right', 'justify'] }),
+    Indent,
 
     // Lists
     BulletList,
     OrderedList,
+    TaskList,
 
-    // Block
+    // Block elements
     Blockquote,
     HorizontalRule,
     CodeBlock,
+    Callout,
 
     // Table
-    Table.configure({ resizable: false }),
+    Table.configure({ resizable: true }),
 
     // Link
     Link.configure({
@@ -227,8 +304,39 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
       HTMLAttributes: { class: 'wiki-link' },
     }),
 
-    // History
+    // Media
+    Image.configure({
+      resourceImage: 'both',
+    }),
+    Video.configure({
+      resourceVideo: 'both',
+    }),
+    Iframe,
+
+    // Advanced / Diagrams / Math
+    Katex,
+    Mermaid,
+    Excalidraw,
+    Emoji,
+
+    // Document operations
+    ExportPdf.configure({
+      paperSize: 'A4',
+      margins: { top: '1in', right: '0.5in', bottom: '1in', left: '0.5in' },
+    }),
+    ExportWord,
+    ImportWord,
+
+    // Multi-column layout
+    Column,
+    ColumnNode,
+    MultipleColumnNode,
+
+    // Utility
     History,
+    SearchAndReplace,
+    SlashCommand,
+    MarkdownPaste.configure({ enabled: true }),
 
     // Mention (requirement references)
     Mention.configure({
@@ -285,6 +393,14 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
       <div className="wiki-editor">
         {!readOnly && (
           <div className="wiki-toolbar">
+            {/* Undo / Redo */}
+            <div className="toolbar-group">
+              <RichTextUndo />
+              <RichTextRedo />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Text formatting */}
             <div className="toolbar-group">
               <RichTextBold />
               <RichTextItalic />
@@ -293,33 +409,100 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
               <RichTextCode />
             </div>
             <div className="toolbar-separator" />
+
+            {/* Font & Size */}
+            <div className="toolbar-group">
+              <RichTextFontFamily />
+              <RichTextFontSize />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Headings */}
             <div className="toolbar-group">
               <RichTextHeading />
             </div>
             <div className="toolbar-separator" />
+
+            {/* Color & Highlight */}
+            <div className="toolbar-group">
+              <RichTextColor />
+              <RichTextHighlight />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Alignment & Indent */}
+            <div className="toolbar-group">
+              <RichTextAlign />
+              <RichTextIndent />
+              <RichTextLineHeight />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Lists */}
             <div className="toolbar-group">
               <RichTextBulletList />
               <RichTextOrderedList />
+              <RichTextTaskList />
             </div>
             <div className="toolbar-separator" />
+
+            {/* Block elements */}
             <div className="toolbar-group">
               <RichTextBlockquote />
               <RichTextCodeBlock />
               <RichTextHorizontalRule />
+              <RichTextCallout />
             </div>
             <div className="toolbar-separator" />
+
+            {/* Table & Columns */}
             <div className="toolbar-group">
               <RichTextTable />
-              <RichTextLink />
+              <RichTextColumn />
             </div>
             <div className="toolbar-separator" />
+
+            {/* Link & Media */}
             <div className="toolbar-group">
-              <RichTextUndo />
-              <RichTextRedo />
+              <RichTextLink />
+              <RichTextImage />
+              <RichTextVideo />
+              <RichTextIframe />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Advanced */}
+            <div className="toolbar-group">
+              <RichTextKatex />
+              <RichTextMermaid />
+              <RichTextExcalidraw />
+              <RichTextEmoji />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Marks & Formatting */}
+            <div className="toolbar-group">
+              <RichTextMoreMark />
+              <RichTextClear />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Document operations */}
+            <div className="toolbar-group">
+              <RichTextImportWord />
+              <RichTextExportWord />
+              <RichTextExportPdf />
+            </div>
+            <div className="toolbar-separator" />
+
+            {/* Search */}
+            <div className="toolbar-group">
+              <RichTextSearchAndReplace />
             </div>
           </div>
         )}
 
+        <SlashCommandList />
         <EditorContent editor={editor} className="wiki-editor-content" />
 
         {!readOnly && (
@@ -327,6 +510,14 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
             <RichTextBubbleText />
             <RichTextBubbleLink />
             <RichTextBubbleTable />
+            <RichTextBubbleImage />
+            <RichTextBubbleVideo />
+            <RichTextBubbleKatex />
+            <RichTextBubbleMermaid />
+            <RichTextBubbleExcalidraw />
+            <RichTextBubbleCallout />
+            <RichTextBubbleColumns />
+            <RichTextBubbleIframe />
             <FloatingReqMenu editor={editor} onCreateRequirement={onCreateRequirement} />
           </>
         )}

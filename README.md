@@ -212,9 +212,27 @@ The **Wiki** sidebar item opens a project-scoped wiki with a hierarchical page t
 - **@-mention autocomplete** — Type `@` in the editor to search requirements by ID or title. Select one to insert a clickable reference badge (e.g. `REQ-0001`) that links directly to the requirement detail page.
 - **Inline requirement creation** — Select text in the editor, then click **+ Req** in the floating toolbar to create a new requirement with the selected text as the title. The text is automatically replaced with a reference to the newly created requirement.
 
-### Editor features
+### Editor features (40+ extensions)
 
-The TipTap-based editor supports: headings (H1–H3), bold, italic, strikethrough, inline code, bullet and ordered lists, blockquotes, code blocks, horizontal rules, tables, undo/redo.
+The editor is powered by `reactjs-tiptap-editor` with 40+ modular extensions:
+
+| Category | Features |
+|---|---|
+| **Text formatting** | Bold, italic, underline, strikethrough, inline code, subscript/superscript, text color, highlight, clear formatting |
+| **Font & typography** | Font family, font size, line height |
+| **Headings & structure** | H1–H3 headings, text alignment (left/center/right/justify), indent/outdent |
+| **Lists** | Bullet lists, ordered lists, task/checkbox lists |
+| **Block elements** | Blockquotes, code blocks (with syntax highlighting), horizontal rules, callout boxes |
+| **Tables** | Resizable tables with header rows, bubble menu for table operations |
+| **Multi-column** | Multi-column layouts with drag-and-drop column management |
+| **Links** | Hyperlinks with link editing bubble menu |
+| **Media** | Images (upload or URL), videos (upload or URL), embedded iframes |
+| **Math** | KaTeX math equations (inline and block) |
+| **Diagrams** | Mermaid diagrams (flowcharts, sequence, Gantt, etc.), Excalidraw whiteboard drawings |
+| **Emoji** | Emoji picker and insertion |
+| **Document operations** | Import from Word (.docx), export to Word (.docx), export to PDF |
+| **Utilities** | Undo/redo, search & replace, slash commands (`/`), markdown paste support |
+| **Requirement integration** | @-mention requirements, inline requirement creation from selected text |
 
 ---
 
