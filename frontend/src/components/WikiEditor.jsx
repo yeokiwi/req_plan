@@ -225,11 +225,14 @@ function FloatingReqMenu({ editor, onCreateRequirement }) {
           if (selectedText.trim()) {
             onCreateRequirement(selectedText.trim(), (req) => {
               editor.chain().focus()
-                .deleteRange({ from, to })
-                .insertContent({
-                  type: 'mention',
-                  attrs: { id: String(req.id), label: req.req_id },
-                })
+                .setTextSelection(to)
+                .insertContent([
+                  { type: 'text', text: ' ' },
+                  {
+                    type: 'mention',
+                    attrs: { id: String(req.id), label: req.req_id },
+                  },
+                ])
                 .run();
             });
           }
