@@ -135,10 +135,19 @@ export default function ModuleDetailPage() {
 
     const headingNode = { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Requirements' }] };
 
+    // Fetch latest wiki content from backend to avoid overwriting edits
+    let latestContent;
+    try {
+      const latest = await api.wiki.get(wikiPage.id);
+      latestContent = latest.content;
+    } catch {
+      latestContent = wikiPage.content;
+    }
+
     // Parse existing wiki content and append the table
     let doc;
     try {
-      const existing = typeof wikiPage.content === 'string' ? JSON.parse(wikiPage.content) : wikiPage.content;
+      const existing = typeof latestContent === 'string' ? JSON.parse(latestContent) : latestContent;
       if (existing && existing.type === 'doc' && Array.isArray(existing.content)) {
         doc = { ...existing, content: [...existing.content, headingNode, tableNode] };
       } else {
