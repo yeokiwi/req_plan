@@ -24,6 +24,7 @@ export default function ModuleDetailPage() {
   const [createReqTitle, setCreateReqTitle] = useState('');
   const [createReqCallback, setCreateReqCallback] = useState(null);
   const wikiSaveTimer = useRef(null);
+  const wikiEditorRef = useRef(null);
 
   useEffect(() => {
     api.modules.get(id).then(m => {
@@ -70,6 +71,79 @@ export default function ModuleDetailPage() {
     if (!confirm('Delete this requirement?')) return;
     await api.requirements.delete(reqId);
     setRequirements(prev => prev.filter(r => r.id !== reqId));
+  }
+
+  function handleExportToWiki() {
+    const editor = wikiEditorRef.current;
+    if (!editor) {
+      alert('Please open the Wiki tab first so the editor is loaded.');
+      return;
+    }
+    if (requirements.length === 0) {
+      alert('No requirements to export.');
+      return;
+    }
+
+    // Build a TipTap table JSON with requirement data
+    const headerCells = ['ID', 'Title', 'Status', 'Priority', 'Tags'].map(text => ({
+      type: 'tableHeader',
+      attrs: { colspan: 1, rowspan: 1 },
+      content: [{ type: 'paragraph', content: [{ type: 'text', marks: [{ type: 'bold' }], text }] }],
+    }));
+
+    const rows = requirements.map(r => {
+      const idCell = {
+        type: 'tableCell',
+        attrs: { colspan: 1, rowspan: 1 },
+        content: [{
+          type: 'paragraph',
+          content: [{
+            type: 'mention',
+            attrs: { id: String(r.id), label: r.req_id },
+          }],
+        }],
+      };
+      const titleCell = {
+        type: 'tableCell',
+        attrs: { colspan: 1, rowspan: 1 },
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: r.title || '' }] }],
+      };
+      const statusCell = {
+        type: 'tableCell',
+        attrs: { colspan: 1, rowspan: 1 },
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: r.status || '' }] }],
+      };
+      const priorityCell = {
+        type: 'tableCell',
+        attrs: { colspan: 1, rowspan: 1 },
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: r.priority || '' }] }],
+      };
+      const tagsText = (r.tags || []).map(t => t.name).join(', ');
+      const tagsCell = {
+        type: 'tableCell',
+        attrs: { colspan: 1, rowspan: 1 },
+        content: [{ type: 'paragraph', content: tagsText ? [{ type: 'text', text: tagsText }] : [] }],
+      };
+      return { type: 'tableRow', content: [idCell, titleCell, statusCell, priorityCell, tagsCell] };
+    });
+
+    const tableNode = {
+      type: 'table',
+      content: [
+        { type: 'tableRow', content: headerCells },
+        ...rows,
+      ],
+    };
+
+    // Insert heading + table at end of document
+    editor.chain().focus('end')
+      .insertContent([
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Requirements' }] },
+        tableNode,
+      ])
+      .run();
+
+    setActiveTab('wiki');
   }
 
   if (!mod) return <Layout><div className="page empty">Loading…</div></Layout>;
@@ -137,6 +211,13 @@ export default function ModuleDetailPage() {
 
         {activeTab === 'requirements' && (
           <div className="card" style={{ padding: 0 }}>
+            {requirements.length > 0 && canEdit && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px 0' }}>
+                <button className="btn btn-secondary btn-sm" onClick={handleExportToWiki}>
+                  Export to Wiki
+                </button>
+              </div>
+            )}
             {requirements.length === 0 ? (
               <div className="empty">No requirements in this module yet.</div>
             ) : (
@@ -193,6 +274,7 @@ export default function ModuleDetailPage() {
                 readOnly={!canEdit}
                 onCreateRequirement={canEdit ? handleCreateRequirement : undefined}
                 placeholder={`Write about ${mod.name}... Use @ to reference requirements`}
+                editorRef={wikiEditorRef}
               />
             ) : (
               <div className="empty">Loading wiki...</div>

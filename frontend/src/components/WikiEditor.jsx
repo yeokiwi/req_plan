@@ -249,7 +249,7 @@ const DocumentWithColumns = Document.extend({
   content: '(block|columns)+',
 });
 
-export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequirement, placeholder }) {
+export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequirement, placeholder, editorRef }) {
   const navigate = useNavigate();
   const { suggestion, SuggestionDropdown } = useMentionSuggestion();
 
@@ -357,6 +357,11 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
       if (onUpdate) onUpdate(JSON.stringify(editor.getJSON()));
     },
   });
+
+  // Expose editor instance to parent via ref
+  useEffect(() => {
+    if (editorRef && editor) editorRef.current = editor;
+  }, [editor, editorRef]);
 
   // Update editor content when prop changes externally
   const prevContent = useRef(content);
