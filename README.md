@@ -13,11 +13,13 @@ A full-stack web application for managing software requirements, organised into 
 | **Traceability** | Link requirements across modules with types: Related, Depends On, Parent, Child |
 | **Traceability Matrix** | Interactive N×N matrix view, scoped by project or module |
 | **Word Export** | Export a full project (requirements table + links list + matrix) to `.docx` |
+| **Export to Wiki** | One-click export of a module's requirement table (ID, title, status, priority, tags) into the module's wiki page, appended to existing content |
 | **Tags** | Colour-coded tags for filtering and categorisation |
 | **User Management** | Admin can create accounts and assign roles (admin / manager / viewer) |
 | **Authentication** | JWT-based login; new users can self-register as viewers |
 | **Wiki Editor** | Per-module and standalone WYSIWYG wiki pages with rich text editing (TipTap), requirement @-mention references, and inline requirement creation |
 | **AI Import** | Upload a Word (.docx) or PDF document; chat with an LLM to extract and refine requirements, then bulk-import them into any module |
+| **User Guide** | Built-in interactive user guide (`/guide`) covering all features, with sidebar table of contents and smooth-scroll navigation |
 
 ### Role permissions
 
@@ -220,7 +222,7 @@ The editor is powered by `reactjs-tiptap-editor` with 40+ modular extensions:
 |---|---|
 | **Text formatting** | Bold, italic, underline, strikethrough, inline code, subscript/superscript, text color, highlight, clear formatting |
 | **Font & typography** | Font family, font size, line height |
-| **Headings & structure** | H1–H3 headings, text alignment (left/center/right/justify), indent/outdent |
+| **Headings & structure** | H1–H6 headings, text alignment (left/center/right/justify), indent/outdent |
 | **Lists** | Bullet lists, ordered lists, task/checkbox lists |
 | **Block elements** | Blockquotes, code blocks (with syntax highlighting), horizontal rules, callout boxes |
 | **Tables** | Resizable tables with header rows, bubble menu for table operations |
@@ -233,6 +235,16 @@ The editor is powered by `reactjs-tiptap-editor` with 40+ modular extensions:
 | **Document operations** | Import from Word (.docx), export to Word (.docx), export to PDF |
 | **Utilities** | Undo/redo, search & replace, slash commands (`/`), markdown paste support |
 | **Requirement integration** | @-mention requirements, inline requirement creation from selected text |
+
+### Export to Wiki
+
+On the module detail page, clicking **Export to Wiki** generates a formatted requirements table (with columns for ID, title, status, priority, and tags) and **appends** it to the module's existing wiki content under a "Requirements" heading. The export always fetches the latest saved wiki content first, so in-progress edits are never overwritten.
+
+---
+
+## User Guide
+
+ReqPlan includes a built-in user guide accessible from the sidebar or at `/guide`. The guide provides comprehensive documentation for all features — projects, modules, requirements, tags, traceability, wiki, AI import, and user management — with a sticky sidebar table of contents and smooth-scroll navigation.
 
 ---
 
