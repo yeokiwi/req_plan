@@ -8,6 +8,8 @@ const SECTIONS = [
   { id: 'requirements',      label: 'Requirements' },
   { id: 'tags',              label: 'Tags' },
   { id: 'traceability',      label: 'Traceability' },
+  { id: 'wiki',              label: 'Wiki Editor' },
+  { id: 'ai-import',         label: 'AI Import' },
   { id: 'reports',           label: 'Reports & Baselines' },
   { id: 'user-management',   label: 'User Management' },
   { id: 'account',           label: 'Your Account' },
@@ -208,11 +210,11 @@ export default function UserGuidePage() {
             <Step n={2}>In the project detail page, click <strong>+ Add Module</strong>.</Step>
             <Step n={3}>Enter the module name and save. Modules appear in the sidebar of the project and can be used to filter requirements.</Step>
 
-            <H3>Exporting a Project</H3>
+            <H3>Exporting a Project to Word</H3>
             <p>
-              On the project detail page, click <strong>Export</strong> to download all requirements
-              for that project as a <strong>JSON file</strong>. This is useful for backups or
-              migrating data to another system.
+              On the project detail page, click <strong>Export to Word</strong> to download a
+              <strong> .docx</strong> document containing all requirements, traceability links, and the
+              traceability matrix for that project.
             </p>
 
             <Tip>Modules are optional. If you don't need sub-divisions, you can add requirements directly to a project without assigning a module.</Tip>
@@ -312,6 +314,99 @@ export default function UserGuidePage() {
             </p>
 
             <Tip>Use the Traceability page to quickly spot requirements that have no links — these may indicate gaps in your coverage analysis.</Tip>
+          </Section>
+
+          {/* ── Wiki Editor ─────────────────────────────────────────── */}
+          <Section id="wiki" title="Wiki Editor">
+            <p>
+              ReqPlan includes a full-featured WYSIWYG wiki editor for documenting modules and
+              projects, with deep integration into the requirement management system.
+            </p>
+
+            <H3>Per-Module Wiki</H3>
+            <p>
+              Each module automatically gets its own wiki page. Open a module and switch to the
+              <strong> Wiki</strong> tab to start editing. Content auto-saves as you type.
+            </p>
+            <Step n={1}>Navigate to a module detail page.</Step>
+            <Step n={2}>Click the <strong>Wiki</strong> tab.</Step>
+            <Step n={3}>Start writing. Changes are saved automatically after a short delay — a status indicator shows <em>Saving...</em> and then <em>Saved</em>.</Step>
+
+            <H3>Standalone Wiki Pages</H3>
+            <p>
+              The <strong>Wiki</strong> item in the sidebar opens a project-scoped wiki with a
+              hierarchical page tree. Create top-level pages and nested sub-pages to organise
+              cross-cutting documentation (architecture, standards, glossary, etc.).
+            </p>
+            <Step n={1}>Click <strong>Wiki</strong> in the sidebar.</Step>
+            <Step n={2}>Select a project, then click <strong>+ New Page</strong> to create a top-level page, or click <strong>+</strong> next to an existing page to create a sub-page.</Step>
+            <Step n={3}>Click a page title in the tree to open and edit it.</Step>
+
+            <H3>Requirement References (@-mentions)</H3>
+            <p>
+              Type <strong>@</strong> in the editor to search for requirements by ID or title.
+              Select one from the autocomplete list to insert a clickable reference badge
+              (e.g. <code>REQ-0001</code>) that links directly to the requirement detail page.
+            </p>
+
+            <H3>Inline Requirement Creation</H3>
+            <Step n={1}>Select text in the editor that describes a requirement.</Step>
+            <Step n={2}>Click <strong>+ Req</strong> in the floating toolbar.</Step>
+            <Step n={3}>Fill in the requirement details in the modal — the selected text is pre-filled as the title.</Step>
+            <Step n={4}>Click <strong>Create</strong>. The selected text is automatically replaced with a reference badge linking to the new requirement.</Step>
+
+            <H3>Export to Wiki</H3>
+            <p>
+              From the module detail page, click <strong>Export to Wiki</strong> to generate a
+              formatted requirements table (ID, title, status, priority, tags) and append it to
+              the module's existing wiki content under a "Requirements" heading. Existing wiki
+              content is always preserved — the table is added at the end.
+            </p>
+
+            <H3>Editor Capabilities</H3>
+            <p>
+              The editor supports 40+ extensions including:
+            </p>
+            <div style={{ marginBottom: 12 }}>
+              <Field name="Formatting">Bold, italic, underline, strikethrough, code, subscript, superscript, text colour, highlight</Field>
+              <Field name="Typography">Font family, font size, line height</Field>
+              <Field name="Structure">H1–H6 headings, text alignment, indent/outdent, blockquotes, horizontal rules, callout boxes</Field>
+              <Field name="Lists">Bullet lists, ordered lists, task/checkbox lists</Field>
+              <Field name="Tables">Resizable tables with header rows and a bubble menu for table operations</Field>
+              <Field name="Media">Images, videos, embedded iframes</Field>
+              <Field name="Advanced">KaTeX math equations, Mermaid diagrams, Excalidraw drawings, multi-column layouts</Field>
+              <Field name="Productivity">Slash commands (<code>/</code>), search &amp; replace, markdown paste support, undo/redo</Field>
+              <Field name="Import/Export">Import from Word (.docx), export to Word (.docx), export to PDF</Field>
+            </div>
+
+            <Note>Viewers can read wiki pages but cannot edit them. Editing requires <RoleBadge role="manager" /> or <RoleBadge role="admin" /> role.</Note>
+          </Section>
+
+          {/* ── AI Import ─────────────────────────────────────────────── */}
+          <Section id="ai-import" title="AI Import">
+            <p>
+              The <strong>AI Import</strong> feature lets managers and admins upload an existing
+              document and use an LLM to extract structured requirements from it, then bulk-import
+              them into any module.
+            </p>
+
+            <H3>How It Works</H3>
+            <Step n={1}>Click <strong>AI Import</strong> in the sidebar.</Step>
+            <Step n={2}>Select the target <strong>project</strong> and <strong>module</strong>.</Step>
+            <Step n={3}>Upload a <strong>.docx</strong> or <strong>.pdf</strong> file (up to 50 MB). The document is parsed and sent to the LLM automatically.</Step>
+            <Step n={4}>The AI extracts requirements and presents them. Use the chat to refine, add, or remove requirements from the list.</Step>
+            <Step n={5}>When satisfied, tell the AI to finalise (e.g. <em>"import these"</em>). A requirements table appears for review.</Step>
+            <Step n={6}>Edit titles, descriptions, priorities, or statuses as needed in the table. Remove any unwanted rows.</Step>
+            <Step n={7}>Click <strong>Import N requirements</strong> to bulk-insert them into the selected module.</Step>
+
+            <H3>Supported File Formats</H3>
+            <div style={{ marginBottom: 12 }}>
+              <Field name=".docx">Word (Open XML) — full text extraction</Field>
+              <Field name=".pdf">PDF — text extraction (scanned/image-only PDFs may return no text)</Field>
+            </div>
+
+            <Note>AI Import requires an OpenAI-compatible LLM to be configured on the server. If the AI features are unavailable, ask your administrator to set the <code>LLM_API_KEY</code> environment variable.</Note>
+            <Tip>You can have a back-and-forth conversation with the AI to iteratively refine the extracted requirements before importing.</Tip>
           </Section>
 
           {/* ── Reports & Baselines ───────────────────────────────────── */}
