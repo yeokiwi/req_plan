@@ -24,7 +24,6 @@ export default function ModuleDetailPage() {
   const [createReqTitle, setCreateReqTitle] = useState('');
   const [createReqCallback, setCreateReqCallback] = useState(null);
   const wikiSaveTimer = useRef(null);
-  const wikiEditorRef = useRef(null);
 
   useEffect(() => {
     api.modules.get(id).then(m => {
@@ -73,10 +72,9 @@ export default function ModuleDetailPage() {
     setRequirements(prev => prev.filter(r => r.id !== reqId));
   }
 
-  function handleExportToWiki() {
-    const editor = wikiEditorRef.current;
-    if (!editor) {
-      alert('Please open the Wiki tab first so the editor is loaded.');
+  async function handleExportToWiki() {
+    if (!wikiPage) {
+      alert('Wiki page is not loaded yet.');
       return;
     }
     if (requirements.length === 0) {
@@ -135,15 +133,30 @@ export default function ModuleDetailPage() {
       ],
     };
 
-    // Insert heading + table at end of document
-    editor.chain().focus('end')
-      .insertContent([
-        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Requirements' }] },
-        tableNode,
-      ])
-      .run();
+    const headingNode = { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Requirements' }] };
 
-    setActiveTab('wiki');
+    // Parse existing wiki content and append the table
+    let doc;
+    try {
+      const existing = typeof wikiPage.content === 'string' ? JSON.parse(wikiPage.content) : wikiPage.content;
+      if (existing && existing.type === 'doc' && Array.isArray(existing.content)) {
+        doc = { ...existing, content: [...existing.content, headingNode, tableNode] };
+      } else {
+        doc = { type: 'doc', content: [headingNode, tableNode] };
+      }
+    } catch {
+      doc = { type: 'doc', content: [headingNode, tableNode] };
+    }
+
+    // Save to backend and update local state so the wiki tab renders it
+    const newContent = JSON.stringify(doc);
+    try {
+      await api.wiki.update(wikiPage.id, { content: newContent });
+      setWikiPage(prev => ({ ...prev, content: newContent }));
+      setActiveTab('wiki');
+    } catch {
+      alert('Failed to save the exported table to the wiki.');
+    }
   }
 
   if (!mod) return <Layout><div className="page empty">Loading…</div></Layout>;
@@ -274,7 +287,6 @@ export default function ModuleDetailPage() {
                 readOnly={!canEdit}
                 onCreateRequirement={canEdit ? handleCreateRequirement : undefined}
                 placeholder={`Write about ${mod.name}... Use @ to reference requirements`}
-                editorRef={wikiEditorRef}
               />
             ) : (
               <div className="empty">Loading wiki...</div>
