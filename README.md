@@ -337,10 +337,10 @@ The build process:
 
 ### 5. Persistent storage (SQLite)
 
-Railway's filesystem is **ephemeral** by default — the SQLite database (`backend/data.db`) will be reset on each redeploy. For a persistent database, add a **Railway Volume**:
+Railway's filesystem is **ephemeral** by default — the SQLite database (`backend/data/data.db`) will be reset on each redeploy. For a persistent database, add a **Railway Volume**:
 
 1. In your service, go to **Settings → Volumes**.
-2. Click **Add Volume** and mount it to `/app/backend`.
+2. Click **Add Volume** and mount it to `/app/backend/data`.
 3. This directory persists across deploys and restarts.
 
 > Without a Volume, data resets on every deploy. A Volume is strongly recommended for production use.
@@ -381,6 +381,6 @@ JWT_SECRET=your-long-random-secret npm run start:backend
 
 ## Database
 
-The SQLite database file is created automatically at `backend/data.db` on first run. No setup is required. The schema and any migrations run at startup.
+The SQLite database file is created automatically at `backend/data/data.db` on first run. No setup is required. The schema and any migrations run at startup.
 
-To reset the database, delete `backend/data.db` and restart the backend.
+To reset the database, delete `backend/data/data.db` and restart the backend.
