@@ -88,6 +88,19 @@ export const api = {
     create: (body) => request('/wiki-pages', { method: 'POST', body: JSON.stringify(body) }),
     update: (id, body) => request(`/wiki-pages/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     delete: (id) => request(`/wiki-pages/${id}`, { method: 'DELETE' }),
+    upload: async (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = getToken();
+      const res = await fetch(`${BASE}/wiki-pages/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    },
   },
   llm: {
     upload: async (file) => {

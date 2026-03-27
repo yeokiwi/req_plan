@@ -1,7 +1,39 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 const db = require('../database');
 const { authenticate, requireRole } = require('../middleware/auth');
+
+const uploadsDir = path.join(__dirname, '../data/uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: uploadsDir,
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, crypto.randomUUID() + ext);
+  },
+});
+
+const allowedMimes = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'video/mp4', 'video/webm', 'video/ogg',
+];
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('File type not allowed. Accepted: images (jpeg, png, gif, webp, svg) and videos (mp4, webm, ogg).'));
+    }
+  },
+});
 
 router.use(authenticate);
 
@@ -50,6 +82,20 @@ router.get('/by-module/:moduleId', (req, res) => {
     page = db.prepare('SELECT * FROM wiki_pages WHERE module_id = ?').get(moduleId);
   }
   res.json(page);
+});
+
+// Upload image or video file
+router.post('/upload', requireRole('admin', 'manager'), upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  res.json({ url: `/api/wiki-pages/uploads/${req.file.filename}` });
+});
+
+// Serve uploaded files
+router.get('/uploads/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(uploadsDir, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  res.sendFile(filePath);
 });
 
 // Get single page

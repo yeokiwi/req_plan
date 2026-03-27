@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { RichTextProvider } from 'reactjs-tiptap-editor';
 import 'reactjs-tiptap-editor/style.css';
+import { api } from '../api';
 
 // Base extensions
 import Document from '@tiptap/extension-document';
@@ -310,9 +311,17 @@ export default function WikiEditor({ content, onUpdate, readOnly, onCreateRequir
     // Media
     Image.configure({
       resourceImage: 'both',
+      upload: async (file) => {
+        const data = await api.wiki.upload(file);
+        return data.url;
+      },
     }),
     Video.configure({
       resourceVideo: 'both',
+      upload: async (file) => {
+        const data = await api.wiki.upload(file);
+        return data.url;
+      },
     }),
     Iframe,
 
